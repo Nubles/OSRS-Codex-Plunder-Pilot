@@ -114,7 +114,7 @@ public class SettingsTest
 				keys.add(item.keyName());
 			}
 		}
-		for (String key : new String[]{"goalLevel", "highlights", "nameOnCard", "plaque", "readyPlaque", "roomOpens", "summary"})
+		for (String key : new String[]{"chaseWarning", "goalLevel", "highlights", "nameOnCard", "packWarning", "plaque", "readyPlaque", "roomOpens", "summary"})
 		{
 			assertTrue(key, keys.contains(key));
 		}

@@ -82,6 +82,30 @@ public interface CodexPlunderPilotConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "chaseWarning",
+		name = "Swarm and mummy warning",
+		description = "Put a scarab swarm or mummy that goes for you first in the next step; off keeps the plan going",
+		position = 3,
+		section = inGame
+	)
+	default boolean chaseWarning()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "packWarning",
+		name = "Full pack warning",
+		description = "Put dropping the cheapest artefacts first in the next step when your pack fills mid-run; off keeps the plan going",
+		position = 4,
+		section = inGame
+	)
+	default boolean packWarning()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "summary",
 		name = "Run summary in chat",
 		description = "Say in the chat box what a run earned and the sceptre odds it carried when it ends",

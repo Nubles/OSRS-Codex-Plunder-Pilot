@@ -885,8 +885,8 @@ public class CodexPlunderPilotPlugin extends Plugin
 			return;
 		}
 		Carried pack = carried();
-		Step.Alarm alarm = new Step.Alarm(pack.free == 0, client.getBoostedSkillLevel(Skill.HITPOINTS) <= Check.LOW_HP,
-			chased(player), client.getRealSkillLevel(Skill.PRAYER) >= 43);
+		Step.Alarm alarm = new Step.Alarm(config.packWarning() && pack.free == 0, client.getBoostedSkillLevel(Skill.HITPOINTS) <= Check.LOW_HP,
+			config.chaseWarning() && chased(player), client.getRealSkillLevel(Skill.PRAYER) >= 43);
 		Step step = Step.next(plan, true, trapActive, triedSlots.size(), alarm);
 
 		List<RoomHighlights.Mark> marks = new ArrayList<>();

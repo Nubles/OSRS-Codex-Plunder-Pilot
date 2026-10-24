@@ -45,6 +45,7 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 - **Highlight the next step** (on): the outlines and urn numbers in the room.
 - **Run plaque** and **Ready plaque** (both on): the plaque during a run, and the ready check's most urgent point before one.
+- **Swarm and mummy warning** and **Full pack warning** (both on): turn either off and the next step keeps going instead of putting that warning first.
 - **Run summary in chat** and **Room openings in chat** (both on).
 - **Goal level** (99): the Thieving level the Runs page counts toward.
 - **Name on cards** (on): turn off to share the pyramid card without your character's name.
