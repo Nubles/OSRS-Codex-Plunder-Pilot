@@ -1,5 +1,6 @@
 package com.codex.plunder;
 
+import com.codex.plunder.notes.FieldNotes;
 import com.codex.plunder.core.Check;
 import com.codex.plunder.core.Experience;
 import com.codex.plunder.core.Goal;
@@ -161,6 +162,9 @@ public class CodexPlunderPilotPlugin extends Plugin
 	@Inject
 	private CodexPlunderPilotConfig config;
 
+	/** The optional local record of what the plugin read and decided. */
+	private FieldNotes notes;
+
 	private final PilotPlaque plaque = new PilotPlaque();
 	private final RoomHighlights highlights = new RoomHighlights();
 	private final RunTracker tracker = new RunTracker();
@@ -215,6 +219,11 @@ public class CodexPlunderPilotPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		notes = new FieldNotes(this::getPluginDirectory, gson);
+		if (config.fieldNotes())
+		{
+			notes.open();
+		}
 		panel = new PilotPanel(new PanelActions());
 		navButton = NavigationButton.builder()
 			.tooltip("Codex Plunder Pilot")
@@ -239,6 +248,11 @@ public class CodexPlunderPilotPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		if (notes != null)
+		{
+			notes.shutdown();
+			notes = null;
+		}
 		overlayManager.remove(plaque);
 		overlayManager.remove(highlights);
 		clientToolbar.removeNavigation(navButton);
@@ -325,6 +339,18 @@ public class CodexPlunderPilotPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
+		if (CodexPlunderPilotConfig.GROUP.equals(event.getGroup()) && "fieldNotes".equals(event.getKey()) && notes != null)
+		{
+			if (config.fieldNotes())
+			{
+				notes.open();
+			}
+			else
+			{
+				notes.close();
+			}
+			return;
+		}
 		if (CodexPlunderPilotConfig.GROUP.equals(event.getGroup()))
 		{
 			dirty = true;
@@ -420,6 +446,19 @@ public class CodexPlunderPilotPlugin extends Plugin
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
+		if (notes != null && notes.isOpen())
+		{
+			net.runelite.api.ChatMessageType chatType = event.getType();
+			// Only the game's own lines: other players' chat is never written down.
+			if (chatType == net.runelite.api.ChatMessageType.GAMEMESSAGE || chatType == net.runelite.api.ChatMessageType.SPAM
+				|| chatType == net.runelite.api.ChatMessageType.MESBOX)
+			{
+				com.google.gson.JsonObject chatNote = new com.google.gson.JsonObject();
+				chatNote.addProperty("type", chatType.name());
+				chatNote.addProperty("text", event.getMessage());
+				notes.note("chat", chatNote);
+			}
+		}
 		ChatMessageType type = event.getType();
 		if (logbook == null || type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.SPAM)
 		{
@@ -1359,6 +1398,16 @@ public class CodexPlunderPilotPlugin extends Plugin
 			.history(Session.history(logbook.getRuns(), now));
 		String name = loggedIn ? client.getLocalPlayer().getName() : null;
 		Plan fresh = Planner.fresh(level, goal, pace);
+		if (notes.isOpen())
+		{
+			// The plan for a fresh run and the pace it was built on, so a wrong room call can be traced.
+			com.google.gson.JsonObject n = new com.google.gson.JsonObject();
+			n.addProperty("level", level);
+			n.add("goal", notes.safe(goal));
+			n.add("pace", notes.safe(pace));
+			n.add("plan", notes.safe(fresh));
+			notes.noteChanged("plan", n);
+		}
 		View view;
 		if (fresh == null)
 		{
