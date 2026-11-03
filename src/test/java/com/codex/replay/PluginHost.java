@@ -38,6 +38,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameObject;
 import net.runelite.api.GameState;
 import net.runelite.api.NPC;
+import net.runelite.api.NPCComposition;
 import net.runelite.api.Skill;
 import net.runelite.api.TileObject;
 import net.runelite.api.WallObject;
@@ -47,6 +48,7 @@ import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.NpcChanged;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.StatChanged;
@@ -58,6 +60,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.plugins.Plugin;
 import org.mockito.Answers;
 import org.mockito.Mockito;
@@ -73,8 +76,8 @@ import org.mockito.Mockito;
  * the script: {@code watch step plaque.shown.step} reads the plugin's {@code plaque} field, then
  * its {@code shown}, then that one's {@code step}, after every tick, as the reading {@code step}.
  *
- * <p>Commands it adds: {@code config KEY VALUE} (a setting of the plugin's config, by its method
- * name), {@code saved KEY VALUE} (a key of the plugin's per-account saved state), {@code watch
+ * <p>Commands it adds: {@code login} (the events of logging in: game states and the account's
+ * profile), {@code config KEY VALUE} (a setting of the plugin's config, by its method name), {@code saved KEY VALUE} (a key of the plugin's per-account saved state), {@code watch
  * NAME PATH}, and {@code call PATH} (calls a no-argument method, such as a panel action).
  *
  * <p>Shared by every Codex plugin: keep this file identical across repositories.
@@ -170,8 +173,35 @@ public final class PluginHost implements Rig
 			case "call":
 				call(args.get(0));
 				return true;
+			case "login":
+				login();
+				return true;
 			default:
 				return false;
+		}
+	}
+
+	/**
+	 * Logs in as the game does: logging in, the account's profile, the scene loading, then in,
+	 * then what you carry and wear. Put the player on a tile first.
+	 */
+	private void login()
+	{
+		game.state(GameState.LOGGING_IN);
+		post(new RuneScapeProfileChanged(null, "replay"));
+		game.state(GameState.LOADING);
+		game.state(GameState.LOGGED_IN);
+		// The game sends what you carry and wear once you are in, even when it is nothing.
+		for (int id : new int[]{net.runelite.api.gameval.InventoryID.INV, net.runelite.api.gameval.InventoryID.WORN})
+		{
+			if (game.client().getItemContainer(id) == null)
+			{
+				game.emptyContainer(id);
+			}
+			else
+			{
+				container(id);
+			}
 		}
 	}
 
@@ -287,6 +317,12 @@ public final class PluginHost implements Rig
 	public void npcDespawned(NPC npc)
 	{
 		post(new NpcDespawned(npc));
+	}
+
+	@Override
+	public void npcChanged(NPC npc, NPCComposition old)
+	{
+		post(new NpcChanged(npc, old));
 	}
 
 	@Override

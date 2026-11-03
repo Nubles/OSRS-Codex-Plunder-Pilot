@@ -88,6 +88,11 @@ public final class FakeGame
 		{
 		}
 
+		/** An NPC turned into another (a portal's shield dropping, say); {@code old} is what it was. */
+		default void npcChanged(NPC npc, NPCComposition old)
+		{
+		}
+
 		default void varp(int id, int value)
 		{
 		}
@@ -122,13 +127,17 @@ public final class FakeGame
 	private final Map<String, TileObject> objects = new LinkedHashMap<>();
 	private final List<NPC> npcs = new ArrayList<>();
 	private final Map<String, NPC> npcNames = new LinkedHashMap<>();
+	private final Map<NPC, int[]> npcIds = new HashMap<>();
 	private final List<Player> players = new ArrayList<>();
 	private final TreeSet<String> unmodelled = new TreeSet<>();
+	/** Interface components that are showing, by component id (group << 16 | child). */
+	private final Map<Integer, Shown> widgets = new HashMap<>();
+	private int world = 301;
 	private int nextHandle;
 
 	private final WorldView view = proxy(WorldView.class, this::worldView);
 	private final Scene scene = proxy(Scene.class, this::scene);
-	private final Player me = proxy(Player.class, (m, a) -> actor(m, a, "You", at, 1));
+	private final Player me = proxy(Player.class, (m, a) -> "getCombatLevel".equals(m.getName()) ? combatLevel() : actor(m, a, "You", at, 1));
 	private final Client client = proxy(Client.class, this::client);
 
 	public FakeGame()
@@ -351,7 +360,48 @@ public final class FakeGame
 	{
 		WorldPoint wp = new WorldPoint(worldX, worldY, plane);
 		int index = npcs.size();
-		NPCComposition comp = proxy(NPCComposition.class, (m, a) ->
+		int[] now = {id};
+		NPC npc = proxy(NPC.class, (m, a) ->
+		{
+			switch (m.getName())
+			{
+				case "getId":
+					return now[0];
+				case "getIndex":
+					return index;
+				case "getComposition":
+				case "getTransformedComposition":
+					return npcComposition(now[0], name, size);
+				default:
+					return actor(m, a, name, wp, size);
+			}
+		});
+		npcIds.put(npc, now);
+		npcs.add(npc);
+		if (handle != null)
+		{
+			npcNames.put(handle, npc);
+		}
+		listener.npcSpawned(npc);
+		return npc;
+	}
+
+	/** Turns an NPC into another by the script's name for it, as the game does when a portal's shield drops. */
+	public void transform(String handle, int id)
+	{
+		NPC npc = npcNames.get(handle);
+		if (npc == null)
+		{
+			throw new IllegalArgumentException("No NPC " + handle);
+		}
+		NPCComposition old = npc.getComposition();
+		npcIds.get(npc)[0] = id;
+		listener.npcChanged(npc, old);
+	}
+
+	private NPCComposition npcComposition(int id, String name, int size)
+	{
+		return proxy(NPCComposition.class, (m, a) ->
 		{
 			switch (m.getName())
 			{
@@ -365,28 +415,6 @@ public final class FakeGame
 					return unknown("NPCComposition." + m.getName(), m);
 			}
 		});
-		NPC npc = proxy(NPC.class, (m, a) ->
-		{
-			switch (m.getName())
-			{
-				case "getId":
-					return id;
-				case "getIndex":
-					return index;
-				case "getComposition":
-				case "getTransformedComposition":
-					return comp;
-				default:
-					return actor(m, a, name, wp, size);
-			}
-		});
-		npcs.add(npc);
-		if (handle != null)
-		{
-			npcNames.put(handle, npc);
-		}
-		listener.npcSpawned(npc);
-		return npc;
 	}
 
 	/** Despawns an NPC by the script's name for it; false when there is none by that name. */
@@ -498,6 +526,41 @@ public final class FakeGame
 		listener.container(containerId);
 	}
 
+	/** What a shown interface component holds; children by index. */
+	public static final class Shown
+	{
+		public String text;
+		public boolean hidden;
+		public int width;
+		public int height;
+		public int itemId = -1;
+		public int itemQuantity;
+		final Map<Integer, Shown> children = new HashMap<>();
+
+		public Shown child(int index)
+		{
+			return children.computeIfAbsent(index, k -> new Shown());
+		}
+	}
+
+	/** An interface component, shown from now on; change its fields to change what it shows. */
+	public Shown widget(int component)
+	{
+		return widgets.computeIfAbsent(component, k -> new Shown());
+	}
+
+	/** Closes an interface component, so the plugin reads it as not there. */
+	public void closeWidget(int component)
+	{
+		widgets.remove(component);
+	}
+
+	/** The world the player is on. */
+	public void world(int world)
+	{
+		this.world = world;
+	}
+
 	public void chat(String type, String message)
 	{
 		listener.chat(type, message);
@@ -518,6 +581,18 @@ public final class FakeGame
 	public int tickCount()
 	{
 		return tick;
+	}
+
+	/** The player's combat level, from their real levels, as the game works it out. */
+	public int combatLevel()
+	{
+		return net.runelite.api.Experience.getCombatLevel(level(Skill.ATTACK), level(Skill.STRENGTH), level(Skill.DEFENCE),
+			level(Skill.HITPOINTS), level(Skill.MAGIC), level(Skill.RANGED), level(Skill.PRAYER));
+	}
+
+	private int level(Skill skill)
+	{
+		return skills.get(skill)[0];
 	}
 
 	/** What a plugin read that this fake does not model, as "Interface.method". */
@@ -617,6 +692,14 @@ public final class FakeGame
 				return regions();
 			case "getCollisionMaps":
 				return collisionMaps();
+			case "getWidget":
+			{
+				int id = a.length == 2 ? ((Integer) a[0] << 16) | (Integer) a[1] : (Integer) a[0];
+				Shown w = widgets.get(id);
+				return w == null ? null : widget(id, w);
+			}
+			case "getWorld":
+				return world;
 			case "getNpcs":
 				return new ArrayList<>(npcs);
 			case "getPlayers":
@@ -751,6 +834,48 @@ public final class FakeGame
 					return new Point(sx + width - 1, sy + length - 1);
 				default:
 					return unknown(type.getSimpleName() + "." + m.getName(), m);
+			}
+		});
+	}
+
+	private net.runelite.api.widgets.Widget widget(int id, Shown w)
+	{
+		return proxy(net.runelite.api.widgets.Widget.class, (m, a) ->
+		{
+			switch (m.getName())
+			{
+				case "getId":
+					return id;
+				case "getText":
+					return w.text;
+				case "isHidden":
+				case "isSelfHidden":
+					return w.hidden;
+				case "getWidth":
+				case "getOriginalWidth":
+					return w.width;
+				case "getHeight":
+				case "getOriginalHeight":
+					return w.height;
+				case "getItemId":
+					return w.itemId;
+				case "getItemQuantity":
+					return w.itemQuantity;
+				case "getChild":
+				{
+					Shown c = w.children.get((Integer) a[0]);
+					return c == null ? null : widget(id, c);
+				}
+				case "getChildren":
+				case "getDynamicChildren":
+				{
+					int n = w.children.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1) + 1;
+					net.runelite.api.widgets.Widget[] out = new net.runelite.api.widgets.Widget[n];
+					w.children.forEach((i, c) -> out[i] = widget(id, c));
+					return out;
+				}
+				default:
+					return unknown("Widget." + m.getName(), m);
 			}
 		});
 	}

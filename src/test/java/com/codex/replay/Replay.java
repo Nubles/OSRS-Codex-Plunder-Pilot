@@ -42,12 +42,17 @@ import net.runelite.api.Skill;
  * multiloc ID VARBIT SHOWN...    an object that shows SHOWN[value of VARBIT] (urns, doors)
  * name ID "Name"                 what the game calls an object (banks are found by name)
  * npc ID "Name" X Y [SIZE] [as NAME]  an NPC (remove NAME despawns it)
+ * transform NAME ID              an NPC turns into another (a portal's shield dropping)
  * player "Name" X Y              another player; actors clears every NPC and player
  * skill SKILL LEVEL [XP]         real level (and experience, else the level's minimum)
  * boost SKILL LEVEL / xp SKILL XP
  * varbit ID VALUE / varp ID VALUE
  * items INV clear                empty an inventory (INV, WORN, BANK)
  * items INV ITEM COUNT [stacked] add COUNT of an item, one a slot unless stacked
+ * widget ID [child N] text "T" | hidden true|false | width N | item ID QTY
+ *                                show an interface component (InterfaceID.Group.COMPONENT) and set it
+ * close ID                       close an interface component
+ * world N                        the world the player is on
  * chat TYPE "message"            a chat message (GAMEMESSAGE, SPAM, ...)
  * state GAME_STATE               LOGGED_IN, LOADING, HOPPING, LOGIN_SCREEN
  * tick [N]                       run the plugin N ticks (1)
@@ -215,6 +220,9 @@ public final class Replay
 					args.size() > 4 ? num(args, 4) : 1, as < 0 ? null : a.get(as + 1));
 				break;
 			}
+			case "transform":
+				game.transform(a.get(0), id("NpcID", a.get(1)));
+				break;
 			case "player":
 				game.player(a.get(0), num(a, 1), num(a, 2), game.at() == null ? 0 : game.at().getPlane());
 				break;
@@ -242,6 +250,15 @@ public final class Replay
 				break;
 			case "items":
 				items(a);
+				break;
+			case "widget":
+				widget(a);
+				break;
+			case "close":
+				game.closeWidget(id("InterfaceID", a.get(0)));
+				break;
+			case "world":
+				game.world(num(a, 0));
 				break;
 			case "chat":
 				game.chat(a.get(0), a.get(1));
@@ -322,6 +339,42 @@ public final class Replay
 			return;
 		}
 		game.remove(game.object(what) != null ? what : "id:" + id("ObjectID", what));
+	}
+
+	private void widget(List<String> a)
+	{
+		FakeGame.Shown w = game.widget(id("InterfaceID", a.get(0)));
+		int i = 1;
+		while (i < a.size() && a.get(i).equals("child"))
+		{
+			w = w.child(num(a, i + 1));
+			i += 2;
+		}
+		for (; i < a.size(); i += 2)
+		{
+			switch (a.get(i))
+			{
+				case "text":
+					w.text = a.get(i + 1);
+					break;
+				case "hidden":
+					w.hidden = Boolean.parseBoolean(a.get(i + 1));
+					break;
+				case "width":
+					w.width = num(a, i + 1);
+					break;
+				case "height":
+					w.height = num(a, i + 1);
+					break;
+				case "item":
+					w.itemId = id("ItemID", a.get(i + 1));
+					w.itemQuantity = num(a, i + 2);
+					i++;
+					break;
+				default:
+					throw new IllegalArgumentException("A widget has text, hidden, width, height or item, not " + a.get(i));
+			}
+		}
 	}
 
 	private void items(List<String> a)
@@ -424,7 +477,10 @@ public final class Replay
 		}
 		try
 		{
-			Field f = Class.forName("net.runelite.api.gameval." + gameval).getField(name);
+			// A nested name, such as InterfaceID's PestStatusOverlay.PEST_STATUS_PORTTXT1, is a nested class's field.
+			int dot = name.lastIndexOf('.');
+			String owner = "net.runelite.api.gameval." + gameval + (dot < 0 ? "" : "$" + name.substring(0, dot).replace('.', '$'));
+			Field f = Class.forName(owner).getField(name.substring(dot + 1));
 			// ObjectID keeps half its names in a package-private parent class.
 			f.setAccessible(true);
 			return f.getInt(null);
