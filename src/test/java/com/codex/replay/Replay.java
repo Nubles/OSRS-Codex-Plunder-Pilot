@@ -41,7 +41,7 @@ import net.runelite.api.Skill;
  * remove NAME|ID                 despawn an object or NPC by name, or every object with an id
  * multiloc ID VARBIT SHOWN...    an object that shows SHOWN[value of VARBIT] (urns, doors)
  * name ID "Name"                 what the game calls an object (banks are found by name)
- * npc ID "Name" X Y [SIZE] [as NAME]  an NPC (remove NAME despawns it)
+ * npc ID "Name" X Y [SIZE] [level L] [as NAME]  an NPC (remove NAME despawns it)
  * transform NAME ID              an NPC turns into another (a portal's shield dropping)
  * player "Name" X Y              another player; actors clears every NPC and player
  * skill SKILL LEVEL [XP]         real level (and experience, else the level's minimum)
@@ -214,10 +214,11 @@ public final class Replay
 				break;
 			case "npc":
 			{
-				int as = a.indexOf("as");
-				List<String> args = as < 0 ? a : a.subList(0, as);
+				List<String> args = new ArrayList<>(a);
+				String handle = take(args, "as");
+				String level = take(args, "level");
 				game.npc(id("NpcID", args.get(0)), args.get(1), num(args, 2), num(args, 3), game.at() == null ? 0 : game.at().getPlane(),
-					args.size() > 4 ? num(args, 4) : 1, as < 0 ? null : a.get(as + 1));
+					args.size() > 4 ? num(args, 4) : 1, level == null ? 0 : Integer.parseInt(level), handle);
 				break;
 			}
 			case "transform":
@@ -339,6 +340,20 @@ public final class Replay
 			return;
 		}
 		game.remove(game.object(what) != null ? what : "id:" + id("ObjectID", what));
+	}
+
+	/** Takes "KEY VALUE" out of a command's words, returning the value, or null when it is not there. */
+	private static String take(List<String> args, String key)
+	{
+		int i = args.indexOf(key);
+		if (i < 0)
+		{
+			return null;
+		}
+		String value = args.get(i + 1);
+		args.remove(i + 1);
+		args.remove(i);
+		return value;
 	}
 
 	private void widget(List<String> a)

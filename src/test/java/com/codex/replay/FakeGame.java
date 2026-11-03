@@ -358,6 +358,12 @@ public final class FakeGame
 
 	public NPC npc(int id, String name, int worldX, int worldY, int plane, int size, String handle)
 	{
+		return npc(id, name, worldX, worldY, plane, size, 0, handle);
+	}
+
+	/** @param level its combat level, which some plugins tell creatures apart by */
+	public NPC npc(int id, String name, int worldX, int worldY, int plane, int size, int level, String handle)
+	{
 		WorldPoint wp = new WorldPoint(worldX, worldY, plane);
 		int index = npcs.size();
 		int[] now = {id};
@@ -371,7 +377,9 @@ public final class FakeGame
 					return index;
 				case "getComposition":
 				case "getTransformedComposition":
-					return npcComposition(now[0], name, size);
+					return npcComposition(now[0], name, size, level);
+				case "getCombatLevel":
+					return level;
 				default:
 					return actor(m, a, name, wp, size);
 			}
@@ -399,7 +407,7 @@ public final class FakeGame
 		listener.npcChanged(npc, old);
 	}
 
-	private NPCComposition npcComposition(int id, String name, int size)
+	private NPCComposition npcComposition(int id, String name, int size, int level)
 	{
 		return proxy(NPCComposition.class, (m, a) ->
 		{
@@ -411,6 +419,8 @@ public final class FakeGame
 					return size;
 				case "getId":
 					return id;
+				case "getCombatLevel":
+					return level;
 				default:
 					return unknown("NPCComposition." + m.getName(), m);
 			}
