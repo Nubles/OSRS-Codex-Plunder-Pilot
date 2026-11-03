@@ -121,6 +121,8 @@ public final class FakeGame
 	private final Map<Skill, int[]> skills = new EnumMap<>(Skill.class);
 	private final Map<Integer, List<Item>> containers = new HashMap<>();
 	private final Map<Integer, String> objectNames = new HashMap<>();
+	/** What items are called and cost, as the game's item definitions and the price guide say. */
+	private final Map<Integer, Object[]> itemDefs = new HashMap<>();
 	/** Objects that change with a varbit: the varbit, then the object shown for each of its values. */
 	private final Map<Integer, int[]> multilocs = new HashMap<>();
 	/** Objects in the scene by the handle given to them in the script. */
@@ -133,6 +135,8 @@ public final class FakeGame
 	/** Interface components that are showing, by component id (group << 16 | child). */
 	private final Map<Integer, Shown> widgets = new HashMap<>();
 	private int world = 301;
+	/** The world's types: none for an ordinary members' world. */
+	private final java.util.Set<net.runelite.api.WorldType> worldTypes = java.util.EnumSet.noneOf(net.runelite.api.WorldType.class);
 	private int nextHandle;
 
 	private final WorldView view = proxy(WorldView.class, this::worldView);
@@ -565,10 +569,25 @@ public final class FakeGame
 		widgets.remove(component);
 	}
 
-	/** The world the player is on. */
-	public void world(int world)
+	/** Names an item, with its Grand Exchange price, for plugins that read items by name or price. */
+	public void item(int id, String name, int price, boolean stacks)
+	{
+		itemDefs.put(id, new Object[]{name, price, stacks});
+	}
+
+	/** An item's price as the plugin's price lookup gives it: 0 unless the script set one. */
+	public int price(int id)
+	{
+		Object[] d = itemDefs.get(id);
+		return d == null ? 0 : (Integer) d[1];
+	}
+
+	/** The world the player is on, and its types (such as SEASONAL or PVP); none is an ordinary world. */
+	public void world(int world, net.runelite.api.WorldType... types)
 	{
 		this.world = world;
+		worldTypes.clear();
+		worldTypes.addAll(Arrays.asList(types));
 	}
 
 	public void chat(String type, String message)
@@ -696,6 +715,8 @@ public final class FakeGame
 				return container(a[0] instanceof Integer ? (Integer) a[0] : idOf(a[0]));
 			case "getObjectDefinition":
 				return objectDefinition((Integer) a[0]);
+			case "getItemDefinition":
+				return itemDefinition((Integer) a[0]);
 			case "isInInstancedRegion":
 				return false;
 			case "getMapRegions":
@@ -710,6 +731,8 @@ public final class FakeGame
 			}
 			case "getWorld":
 				return world;
+			case "getWorldType":
+				return java.util.EnumSet.copyOf(worldTypes.isEmpty() ? java.util.EnumSet.noneOf(net.runelite.api.WorldType.class) : worldTypes);
 			case "getNpcs":
 				return new ArrayList<>(npcs);
 			case "getPlayers":
@@ -886,6 +909,36 @@ public final class FakeGame
 				}
 				default:
 					return unknown("Widget." + m.getName(), m);
+			}
+		});
+	}
+
+	private net.runelite.api.ItemComposition itemDefinition(int id)
+	{
+		Object[] d = itemDefs.get(id);
+		return proxy(net.runelite.api.ItemComposition.class, (m, a) ->
+		{
+			switch (m.getName())
+			{
+				case "getId":
+					return id;
+				case "getName":
+				case "getMembersName":
+					return d == null ? "null" : d[0];
+				case "getNote":
+				case "getLinkedNoteId":
+				case "getPlaceholderId":
+				case "getPlaceholderTemplateId":
+					return -1;
+				case "getPrice":
+					return d == null ? 0 : d[1];
+				case "isStackable":
+					return d != null && (Boolean) d[2];
+				case "isTradeable":
+				case "isMembers":
+					return true;
+				default:
+					return unknown("ItemComposition." + m.getName(), m);
 			}
 		});
 	}

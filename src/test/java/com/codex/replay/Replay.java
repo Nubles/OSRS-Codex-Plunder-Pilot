@@ -47,12 +47,13 @@ import net.runelite.api.Skill;
  * skill SKILL LEVEL [XP]         real level (and experience, else the level's minimum)
  * boost SKILL LEVEL / xp SKILL XP
  * varbit ID VALUE / varp ID VALUE
+ * item ITEM "Name" [price N] [stacks]  name an item (and its price) for plugins that read them
  * items INV clear                empty an inventory (INV, WORN, BANK)
  * items INV ITEM COUNT [stacked] add COUNT of an item, one a slot unless stacked
  * widget ID [child N] text "T" | hidden true|false | width N | item ID QTY
  *                                show an interface component (InterfaceID.Group.COMPONENT) and set it
  * close ID                       close an interface component
- * world N                        the world the player is on
+ * world N [TYPE...]              the world the player is on, and its types (SEASONAL, PVP...)
  * chat TYPE "message"            a chat message (GAMEMESSAGE, SPAM, ...)
  * state GAME_STATE               LOGGED_IN, LOADING, HOPPING, LOGIN_SCREEN
  * tick [N]                       run the plugin N ticks (1)
@@ -249,6 +250,14 @@ public final class Replay
 			case "varp":
 				game.varp(id("VarPlayerID", a.get(0)), num(a, 1));
 				break;
+			case "item":
+			{
+				List<String> args = new ArrayList<>(a);
+				String price = take(args, "price");
+				boolean stacks = args.remove("stacks");
+				game.item(id("ItemID", args.get(0)), args.get(1), price == null ? 0 : Integer.parseInt(price), stacks);
+				break;
+			}
 			case "items":
 				items(a);
 				break;
@@ -259,8 +268,15 @@ public final class Replay
 				game.closeWidget(id("InterfaceID", a.get(0)));
 				break;
 			case "world":
-				game.world(num(a, 0));
+			{
+				net.runelite.api.WorldType[] types = new net.runelite.api.WorldType[a.size() - 1];
+				for (int i = 1; i < a.size(); i++)
+				{
+					types[i - 1] = net.runelite.api.WorldType.valueOf(a.get(i));
+				}
+				game.world(num(a, 0), types);
 				break;
+			}
 			case "chat":
 				game.chat(a.get(0), a.get(1));
 				break;

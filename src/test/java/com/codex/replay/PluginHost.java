@@ -61,6 +61,7 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.RuneScapeProfileChanged;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import org.mockito.Answers;
 import org.mockito.Mockito;
@@ -70,11 +71,13 @@ import org.mockito.Mockito;
  * and sent the game's events and a {@link GameTick} each tick through its {@code @Subscribe}
  * methods. The game is the {@link FakeGame}; the config and saved state are kept in memory;
  * the client thread and background executor run work at once; everything else RuneLite would
- * inject (the overlay manager, the toolbar, item prices...) is a Mockito mock that does nothing.
+ * inject (the overlay manager, the toolbar...) is a Mockito mock that does nothing, except item
+ * names and prices, which come from the script's {@code item} lines.
  *
  * <p>What a script checks is read out of the plugin by a path of fields and getters, declared in
  * the script: {@code watch step plaque.shown.step} reads the plugin's {@code plaque} field, then
  * its {@code shown}, then that one's {@code step}, after every tick, as the reading {@code step}.
+ * A number picks from a list or an array: {@code tripPlaque.shown.lines.0.text}.
  *
  * <p>Commands it adds: {@code login} (the events of logging in: game states and the account's
  * profile), {@code config KEY VALUE} (a setting of the plugin's config, by its method name), {@code saved KEY VALUE} (a key of the plugin's per-account saved state), {@code watch
@@ -396,6 +399,13 @@ public final class PluginHost implements Rig
 
 	private static Object step(Object on, String part, String path)
 	{
+		if (part.matches("\\d+") && (on instanceof List || on.getClass().isArray()))
+		{
+			// An index into a list or an array: lines.0 is the first line.
+			int i = Integer.parseInt(part);
+			int n = on instanceof List ? ((List<?>) on).size() : java.lang.reflect.Array.getLength(on);
+			return i >= n ? null : on instanceof List ? ((List<?>) on).get(i) : java.lang.reflect.Array.get(on, i);
+		}
 		String getter = "get" + Character.toUpperCase(part.charAt(0)) + part.substring(1);
 		String is = "is" + Character.toUpperCase(part.charAt(0)) + part.substring(1);
 		try
@@ -453,7 +463,7 @@ public final class PluginHost implements Rig
 			bind(ScheduledExecutorService.class).toInstance(executor());
 			for (Class<?> needed : injected(type))
 			{
-				bind((Class) needed).toInstance(Mockito.mock(needed));
+				bind((Class) needed).toInstance(needed == ItemManager.class ? itemManager() : Mockito.mock(needed));
 			}
 		}
 	}
@@ -551,6 +561,25 @@ public final class PluginHost implements Rig
 		});
 	}
 
+	/** Item names and prices from the script ({@code item}); everything else as a mock. */
+	private ItemManager itemManager()
+	{
+		return Mockito.mock(ItemManager.class, inv ->
+		{
+			switch (inv.getMethod().getName())
+			{
+				case "getItemComposition":
+					return game.client().getItemDefinition((Integer) inv.getArgument(0));
+				case "getItemPrice":
+					return (long) game.price((Integer) inv.getArgument(0));
+				case "canonicalize":
+					return inv.getArgument(0);
+				default:
+					return Answers.RETURNS_DEFAULTS.answer(inv);
+			}
+		});
+	}
+
 	/** Runs submitted work at once; repeating work (autosaves) never runs. */
 	private static ScheduledExecutorService executor()
 	{
@@ -559,6 +588,8 @@ public final class PluginHost implements Rig
 			switch (inv.getMethod().getName())
 			{
 				case "execute":
+					((Runnable) inv.getArgument(0)).run();
+					return null;
 				case "submit":
 					Object task = inv.getArgument(0);
 					if (task instanceof Runnable)
