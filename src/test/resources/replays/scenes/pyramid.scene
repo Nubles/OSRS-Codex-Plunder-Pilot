@@ -1,0 +1,29 @@
+# A schematic Jalsavrah (Pyramid Plunder) room for replays. Not the real map.
+#
+# Facts:
+#  - the pyramid is map region 7749 (RuneLite's PyramidPlunderPlugin.PYRAMID_PLUNDER_REGION); the player and urns stand in it
+#  - rooms open at 21, 31, 41 ... 91 Thieving; a run lasts five minutes (500 ticks); each room's
+#    spear trap is disarmed first (oldschool.runescape.wiki/w/Pyramid_Plunder)
+#  - varbits NTK_ROOM_NUMBER, NTK_PLAYER_TIMER_COUNT (ticks into the run), NTK_TRAP_ACTIVE and one
+#    NTK_URNn_STATE per urn are RuneLite's names (net.runelite.api.gameval.VarbitID)
+# Schematic: each urn object NTK_URN_TYPE1_MULTI_n changes with NTK_URNn_STATE, showing a closed
+# urn at 0 and an open one at 1. The real state numbering is the game's and is not modelled.
+
+scene 1920 4416
+at 1950 4450
+
+multiloc NTK_URN_TYPE1_MULTI_1 NTK_URN1_STATE NTK_URN1_CLOSED NTK_URN1_OPEN
+multiloc NTK_URN_TYPE1_MULTI_2 NTK_URN2_STATE NTK_URN1_CLOSED NTK_URN1_OPEN
+multiloc NTK_URN_TYPE1_MULTI_3 NTK_URN3_STATE NTK_URN1_CLOSED NTK_URN1_OPEN
+multiloc NTK_URN_TYPE1_MULTI_4 NTK_URN4_STATE NTK_URN1_CLOSED NTK_URN1_OPEN
+multiloc NTK_URN_TYPE1_MULTI_5 NTK_URN5_STATE NTK_URN1_CLOSED NTK_URN1_OPEN
+object NTK_URN_TYPE1_MULTI_1 1945 4455 as urn1
+object NTK_URN_TYPE1_MULTI_2 1947 4455 as urn2
+object NTK_URN_TYPE1_MULTI_3 1949 4455 as urn3
+object NTK_URN_TYPE1_MULTI_4 1951 4455 as urn4
+object NTK_URN_TYPE1_MULTI_5 1953 4455 as urn5
+
+# What the plaque on screen says.
+watch figure plaque.shown.figure
+watch step plaque.shown.step
+watch detail plaque.shown.detail
