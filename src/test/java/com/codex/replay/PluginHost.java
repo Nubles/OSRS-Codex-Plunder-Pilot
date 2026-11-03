@@ -80,7 +80,8 @@ import org.mockito.Mockito;
  * A number picks from a list or an array: {@code tripPlaque.shown.lines.0.text}.
  *
  * <p>Commands it adds: {@code login} (the events of logging in: game states and the account's
- * profile), {@code config KEY VALUE} (a setting of the plugin's config, by its method name), {@code saved KEY VALUE} (a key of the plugin's per-account saved state), {@code watch
+ * profile), {@code config KEY VALUE} (a setting of the plugin's config, by its method name), {@code saved KEY VALUE} (a key of the plugin's per-account saved state), {@code saved-in GROUP
+ * KEY VALUE} and {@code config-in GROUP KEY VALUE} (another plugin's saved state and settings), {@code watch
  * NAME PATH}, and {@code call PATH} (calls a no-argument method, such as a panel action).
  *
  * <p>Shared by every Codex plugin: keep this file identical across repositories.
@@ -168,6 +169,14 @@ public final class PluginHost implements Rig
 				return true;
 			case "saved":
 				store.put("rs." + group + "." + args.get(0), args.get(1));
+				return true;
+			case "saved-in":
+				// Another plugin's per-account state, such as RuneLite's own time tracking.
+				store.put("rs." + args.get(0) + "." + args.get(1), args.get(2));
+				return true;
+			case "config-in":
+				// Another plugin's whole-client setting, such as whether a plugin is turned on.
+				store.put(args.get(0) + "." + args.get(1), args.get(2));
 				return true;
 			case "watch":
 				read(args.get(1));
