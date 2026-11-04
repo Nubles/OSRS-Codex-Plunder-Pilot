@@ -1,0 +1,40 @@
+# A run through room 1 at 21 Thieving, as the plaque calls it: the trap, then the urns, counting
+# down as each is searched, against a clock of 500 ticks (five minutes, wiki: Pyramid Plunder).
+include /replays/scenes/pyramid.scene
+skill THIEVING 21
+skill HITPOINTS 40
+skill PRAYER 43
+tick 2
+
+# In: room 1, 10 ticks gone, the spear trap still up.
+varbit NTK_ROOM_NUMBER 1
+varbit NTK_PLAYER_TIMER_COUNT 10
+varbit NTK_TRAP_ACTIVE 1
+tick
+expect figure = "R1  4:54"
+expect step = "Pass the spear trap"
+
+# Through the trap: the urns.
+varbit NTK_TRAP_ACTIVE 0
+varbit NTK_PLAYER_TIMER_COUNT 20
+tick
+expect step = "Search 5 urns"
+varbit NTK_URN1_STATE 1
+tick
+expect step = "Search 4 urns"
+varbit NTK_URN2_STATE 1
+varbit NTK_URN3_STATE 1
+varbit NTK_URN4_STATE 1
+tick
+expect step = "Search 1 urn"
+varbit NTK_URN5_STATE 1
+tick
+never step ~ Search
+tick
+forget
+
+# The clock runs out and the run ends: back to the ready check for the next one.
+varbit NTK_PLAYER_TIMER_COUNT 0
+tick
+expect figure = Tip
+expect step = "Bring a snake charm"

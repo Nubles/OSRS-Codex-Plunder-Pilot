@@ -1,0 +1,16 @@
+# Waiting at the pyramid before a run, the plaque gives the ready check's most urgent point.
+include /replays/scenes/pyramid.scene
+skill THIEVING 21
+skill PRAYER 43
+
+# Hitpoints 10: a snake bite can do 4 and poison for 4 (wiki: Pyramid Plunder).
+skill HITPOINTS 10
+tick 2
+expect figure = "Before you go"
+expect step = "Low hitpoints"
+
+# Healthy, but under 51 Thieving with no snake charm.
+skill HITPOINTS 40
+tick
+expect figure = Tip
+expect step = "Bring a snake charm"
