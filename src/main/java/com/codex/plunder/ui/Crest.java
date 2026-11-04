@@ -32,6 +32,16 @@ public class Crest extends JComponent
 	private Color statusColor = Theme.TEXT_MUTED;
 	private Color figureTint = Theme.GOLD_DIM;
 	private double progress = -1;
+	/** Draws the Sepulchre's coffin in the medallion instead of the pyramid. */
+	private boolean coffin;
+
+	/** A crest with the Sepulchre's coffin in its medallion. */
+	public static Crest sepulchre()
+	{
+		Crest c = new Crest();
+		c.coffin = true;
+		return c;
+	}
 
 	public Crest()
 	{
@@ -114,7 +124,14 @@ public class Crest extends JComponent
 		g.setStroke(new BasicStroke(1f));
 		g.setColor(Theme.alpha(Theme.GOLD, 70));
 		g.draw(new Ellipse2D.Float(mx + 5, my + 5, md - 10, md - 10));
-		Sigil.paint(g, mx + 11, my + 11, md - 22);
+		if (coffin)
+		{
+			SepulchreSigil.paint(g, mx + 11, my + 11, md - 22);
+		}
+		else
+		{
+			Sigil.paint(g, mx + 11, my + 11, md - 22);
+		}
 
 		int tx = mx + md + 12;
 		int room = w - tx - 8;

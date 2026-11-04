@@ -53,6 +53,28 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **Chat.** When a run ends, a line with the room reached, the experience, the artefacts and the sceptre odds it carried, and the room that ran slowest against your quickest. When a new level opens a deeper room, a line says so and what a run pays there now.
 
+## Hallowed Sepulchre
+
+A second panel, **Codex Sepulchre**, does for the Hallowed Sepulchre what the Pilot does for the pyramid, and stays information only: it never points at an obstacle or says when to move (RuneLite's Agility plugin already highlights those).
+
+**Floor splits against your ghost.** Every run is logged for your account, floor by floor, with the game's own floor times where it says them. Your fastest run to each depth is your ghost. During a run the panel (and, if you turn it on, a small table in the game view) shows each floor against the ghost, green where you are quicker and ember where you are slower, and the crest shows how far ahead or behind you are as you go. When the run ends, the panel and a chat line say how it went and whether it is the new ghost.
+
+<p align="center">
+  <img src="docs/screenshots/sepulchre-run-live.png" width="225" alt="Floor splits during a run">
+  <img src="docs/screenshots/sepulchre-last-run.png" width="225" alt="The last run against the ghost">
+</p>
+
+**Marks and rewards.** Coffins and the Grand Hallowed Coffin are counted from the marks they put in your pack. The Marks page gives your marks a run and an hour at your own pace (counting your usual walk back between runs), your marks in the pack and bank, and how many runs and how much play time stand between you and the reward you are saving for: dark graceful (six dark dyes), a dark dye, the hallowed tools, the hallowed ring or the dark acorn.
+
+**Unique odds.** For the Ring of endurance, the Strange old lockpick and each floor's Mysterious page you have not yet found, the chance on one of your runs, worked out from the coffins you really loot on each floor and how often you open the grand coffin, the runs to even odds, and how dry you are against every coffin logged.
+
+<p align="center">
+  <img src="docs/screenshots/sepulchre-marks.png" width="225" alt="Marks, rewards and unique odds">
+  <img src="docs/screenshots/sepulchre-overlay.png" width="214" alt="Floor splits in the game view">
+</p>
+
+Settings, under **Hallowed Sepulchre**: **Sepulchre panel** (on), **Saving marks for** (dark graceful), **Floor splits on screen** (off) and **Sepulchre summary in chat** (on).
+
 ## Settings that matter
 
 - **Highlight the next step** (on): the outlines and urn numbers in the room.
