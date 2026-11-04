@@ -2,7 +2,9 @@ package com.codex.plunder;
 
 import com.codex.plunder.core.Check;
 import com.codex.plunder.core.Experience;
+import com.codex.plunder.core.Ghost;
 import com.codex.plunder.core.Goal;
+import com.codex.plunder.core.Grade;
 import com.codex.plunder.core.Here;
 import com.codex.plunder.core.Leaks;
 import com.codex.plunder.core.Logbook;
@@ -24,10 +26,12 @@ import com.codex.plunder.core.Splits;
 import com.codex.plunder.core.Stash;
 import com.codex.plunder.core.Step;
 import com.codex.plunder.core.Unlock;
+import com.codex.plunder.overlay.GhostOverlay;
 import com.codex.plunder.overlay.PilotPlaque;
 import com.codex.plunder.overlay.RoomHighlights;
 import com.codex.plunder.ui.Actions;
 import com.codex.plunder.ui.Format;
+import com.codex.plunder.ui.GhostTable;
 import com.codex.plunder.ui.PilotPanel;
 import com.codex.plunder.ui.Sigil;
 import com.codex.plunder.ui.Theme;
@@ -162,6 +166,12 @@ public class CodexPlunderPilotPlugin extends Plugin
 	private CodexPlunderPilotConfig config;
 
 	private final PilotPlaque plaque = new PilotPlaque();
+	private final GhostOverlay ghostOverlay = new GhostOverlay();
+	/** The run under way against its ghost, worked out each tick of it. */
+	private View.GhostSplits liveSplits;
+	/** The last run against the ghost it was measured with, and its grade, shown until the next run. */
+	private View.GhostSplits lastSplits;
+	private Grade lastGrade;
 	private final RoomHighlights highlights = new RoomHighlights();
 	private final RunTracker tracker = new RunTracker();
 	private final List<GameObject> urns = new ArrayList<>();
@@ -225,6 +235,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 		clientToolbar.addNavigation(navButton);
 		overlayManager.add(plaque);
 		overlayManager.add(highlights);
+		overlayManager.add(ghostOverlay);
 		clientThread.invokeLater(() ->
 		{
 			loadProfile();
@@ -241,6 +252,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 	{
 		overlayManager.remove(plaque);
 		overlayManager.remove(highlights);
+		overlayManager.remove(ghostOverlay);
 		clientToolbar.removeNavigation(navButton);
 		clientThread.invokeLater(() ->
 		{
@@ -851,6 +863,11 @@ public class CodexPlunderPilotPlugin extends Plugin
 		}
 		lastRoom = room;
 		lastClosedUrns = slots.isEmpty() ? -1 : urnsLeft;
+		// The run so far against its ghost: stats only, nothing here changes what to do next.
+		liveSplits = new View.GhostSplits(tracker.snapshot(now), logbook.liveGhost(tracker.getGoal(), Room.highest(level)), true);
+		lastGrade = null;
+		lastSplits = null;
+		ghostOverlay.show(config.ghostOverlay() ? new GhostTable.Slim(liveSplits) : null);
 		lastChestOpen = chestOpen;
 		lastSarcophagusOpen = sarcophagusOpen;
 
@@ -1033,6 +1050,8 @@ public class CodexPlunderPilotPlugin extends Plugin
 	private void endRun()
 	{
 		highlights.show(null);
+		ghostOverlay.show(null);
+		liveSplits = null;
 		plaque.show(null, null, null, null, 0);
 		lastRoom = null;
 		lastClosedUrns = -1;
@@ -1051,6 +1070,12 @@ public class CodexPlunderPilotPlugin extends Plugin
 		Splits before = splits(run.getGoal(), top).all;
 		boolean best = before.hasBest() && before.isNewBest(run, run.getGoal());
 		int gained = best ? before.bestAt(top) - run.splitAt(top) : 0;
+		String ghostKey = Ghost.key(run.getGoal(), top, run.getDeepest());
+		Run ghost = logbook.ghost(ghostKey);
+		Grade grade = Ghost.usable(run) ? Grade.of(run, ghost, run.getGoal()) : null;
+		lastGrade = grade;
+		lastSplits = grade == null ? null : new View.GhostSplits(run, ghost, false);
+		logbook.offerGhost(ghostKey, run, run.getGoal());
 		logbook.record(run, opened);
 		unsaved = true;
 		save();
@@ -1082,6 +1107,14 @@ public class CodexPlunderPilotPlugin extends Plugin
 				{
 					message.append(". Room " + slow.getNumber() + " ran " + Format.seconds(before.overrun(run, slow)) + " over your quickest");
 				}
+			}
+			if (grade != null && grade.getLetter() != null)
+			{
+				message.append(". Grade " + grade.getLetter() + " against your ghost" + (grade.isNewGhost() ? ", the new ghost" : ""));
+			}
+			else if (grade != null && grade.isNewGhost())
+			{
+				message.append(". Now your ghost for room " + run.getDeepest());
 			}
 			Session session = Session.latest(logbook.getRuns(), System.currentTimeMillis());
 			if (session.getRuns().size() >= 2)
@@ -1222,6 +1255,9 @@ public class CodexPlunderPilotPlugin extends Plugin
 		sharedBank = null;
 		splitBooks.clear();
 		splitBooksRuns = -1;
+		lastGrade = null;
+		lastSplits = null;
+		liveSplits = null;
 		int generation = ++loadGeneration;
 		if (profile == null)
 		{
@@ -1383,7 +1419,8 @@ public class CodexPlunderPilotPlugin extends Plugin
 				view.ready(new View.Ready(readyChecks(level), pack.artefacts, pack.artefactValue));
 			}
 		}
-		view.stash(stash()).goals(navigatorNeeds(level)).nameOnCard(config.nameOnCard());
+		view.stash(stash()).goals(navigatorNeeds(level)).nameOnCard(config.nameOnCard())
+			.ghost(live != null ? liveSplits : lastSplits).grade(live != null ? null : lastGrade);
 		SwingUtilities.invokeLater(() -> target.update(view));
 	}
 

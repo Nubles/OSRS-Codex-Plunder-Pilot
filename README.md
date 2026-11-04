@@ -33,6 +33,18 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
   <img src="docs/screenshots/pyramid-card.png" width="330" alt="The pyramid card">
 </p>
 
+**Ghost splits.** Every run is cut into its natural segments and timed in game ticks: each room, and inside it the trap, walk and door, the urns, the grand gold chest and the sarcophagus. Your best run of each kind is kept as your ghost: the best experience an hour (or sceptre odds an hour on a sceptre run) for the deepest room your level opens and the room the run reached. During a run the Pilot page shows a slim split table, each room against the ghost, green where you are quicker and ember where you are slower, with the room you are in opened into its parts. It is stats only; the next step is planned exactly as before.
+
+<p align="center">
+  <img src="docs/screenshots/ghost-splits.png" width="242" alt="Ghost splits during a run">
+</p>
+
+**Grade card.** When a run ends, the Pilot page grades it S, A, B or C against the ghost (S within 2% of the ghost's rate or past it, A within 10%, B within 25%) and names the one to three biggest time sinks in plain words: "Room 7: 72 ticks searching 9 urns, ghost took 64". Searching more urns than the ghost is not counted slow, only a slower pace. Below are your experience and loot an hour against the ghost's. A run that beats the ghost becomes the new one. The first run of its kind sets the ghost. The grade also goes on the end-of-run chat line.
+
+<p align="center">
+  <img src="docs/screenshots/grade-card.png" width="242" alt="The grade card">
+</p>
+
 **Time lost.** Each room on the way down, timed without its searching: the trap, the walk and finding the door. Your usual time over your last 20 runs is set against your quickest, and the gap is priced in what it costs you: the experience an hour those seconds would earn searching deeper. The room that gives the most away is lit, so you know exactly where to tighten up.
 
 <p align="center">
@@ -46,6 +58,7 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 - **Highlight the next step** (on): the outlines and urn numbers in the room.
 - **Run plaque** and **Ready plaque** (both on): the plaque during a run, and the ready check's most urgent point before one.
 - **Swarm and mummy warning** and **Full pack warning** (both on): turn either off and the next step keeps going instead of putting that warning first.
+- **Ghost splits on screen** (off): the split table in the game view too, for runs with the panel shut.
 - **Run summary in chat** and **Room openings in chat** (both on).
 - **Goal level** (99): the Thieving level the Runs page counts toward.
 - **Name on cards** (on): turn off to share the pyramid card without your character's name.
