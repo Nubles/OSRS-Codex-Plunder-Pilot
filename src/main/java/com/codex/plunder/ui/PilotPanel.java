@@ -2,6 +2,7 @@ package com.codex.plunder.ui;
 
 import com.codex.plunder.core.Check;
 import com.codex.plunder.core.Goal;
+import com.codex.plunder.core.Grade;
 import com.codex.plunder.core.Levels;
 import com.codex.plunder.core.NavigatorGoals;
 import com.codex.plunder.core.Odds;
@@ -243,6 +244,10 @@ public class PilotPanel extends PluginPanel
 			replace(pilot, stack);
 			return;
 		}
+		if (!view.inRun() && view.grade != null)
+		{
+			addGrade(stack, view.grade, view.ghost);
+		}
 		stack.add(new SectionHeader("Run for", view.inRun() ? "replanned every tick" : null));
 		stack.add(goal);
 
@@ -300,6 +305,20 @@ public class PilotPanel extends PluginPanel
 		}
 		stack.add(tiles);
 
+		if (view.inRun() && view.ghost != null)
+		{
+			stack.add(new SectionHeader("Ghost splits", view.ghost.ghost == null ? "no ghost yet" : "game ticks"));
+			Card splits = new Card(new BorderLayout(0, 4));
+			splits.accent(Theme.GOLD_DIM);
+			splits.add(new GhostTable(view.ghost), BorderLayout.CENTER);
+			if (view.ghost.ghost == null)
+			{
+				splits.add(Ui.wrapped("Your first timed run of this kind. Finish it and it becomes the ghost the next one races.",
+					Theme.small(), Theme.TEXT_FAINT, WIDTH - 30), BorderLayout.SOUTH);
+			}
+			stack.add(splits);
+		}
+
 		stack.add(new SectionHeader("Route", "room " + plan.current().getRoom().getNumber() + " to " + plan.getTop().getNumber()));
 		Card route = new Card(new BorderLayout());
 		StackPanel rows = new StackPanel(0, 0);
@@ -318,6 +337,51 @@ public class PilotPanel extends PluginPanel
 			: "Paced at typical speeds until a few of your runs are timed. Chests and sarcophagi last in each room.";
 		stack.add(Ui.wrapped(foot, Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 		replace(pilot, stack);
+	}
+
+	/** The last run's grade card: the letter, its rate against the ghost, and where the time went. */
+	private void addGrade(StackPanel stack, Grade grade, View.GhostSplits splits)
+	{
+		stack.add(new SectionHeader("Last run", grade.getLetter() == null ? "ghost set" : "against your ghost"));
+		Card card = new Card(new BorderLayout(0, 6));
+		card.accent(GradeMedal.tint(grade.getLetter())).highlighted(grade.getLetter() == Grade.Letter.S);
+		card.add(new GradeMedal(grade), BorderLayout.NORTH);
+		StackPanel body = new StackPanel(4, 0);
+		if (grade.getLetter() != null)
+		{
+			if (grade.getSinks().isEmpty())
+			{
+				body.add(Ui.wrapped("No part of any room ran " + Grade.SINK_MIN + " ticks or more over your ghost.", Theme.small(), Theme.GREEN, WIDTH - 30));
+			}
+			else
+			{
+				body.add(Ui.label("WHERE THE TIME WENT", Theme.small(), Theme.TEXT_FAINT));
+				for (Grade.Sink sink : grade.getSinks())
+				{
+					body.add(Ui.wrapped(sink.sentence(), Theme.small(), Theme.TEXT, WIDTH - 30));
+				}
+			}
+		}
+		if (splits != null && !splits.live && splits.ghost != null)
+		{
+			body.add(new GhostTable(splits));
+		}
+		String foot;
+		if (grade.getLetter() == null)
+		{
+			foot = "Your first run to room " + grade.getDeepest() + " at this level is now your ghost. The next one is split against it, tick by tick.";
+		}
+		else if (grade.isNewGhost())
+		{
+			foot = "The best of its kind yet: the next run to room " + grade.getDeepest() + " races this one.";
+		}
+		else
+		{
+			foot = "S is within 2% of your ghost's rate, A within 10%, B within 25%.";
+		}
+		body.add(Ui.wrapped(foot, Theme.small(), Theme.TEXT_FAINT, WIDTH - 30));
+		card.add(body, BorderLayout.CENTER);
+		stack.add(card);
 	}
 
 	// The Odds tab.

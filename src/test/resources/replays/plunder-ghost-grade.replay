@@ -1,0 +1,133 @@
+# Ghost splits and the run grade. Two runs at 31 Thieving, so rooms 1 and 2 are open (wiki:
+# Pyramid Plunder, "Every ten levels thereafter will grant entrance to the more valuable rooms").
+# The first run sets the ghost; the second searches room 2's urns slower and is graded B against it.
+# Urn experience is the plugin's own per-room figure (60 in room 1, 90 in room 2); a game tick is
+# 0.6 seconds (wiki: Game tick).
+include /replays/scenes/pyramid.scene
+skill THIEVING 31 14833
+skill HITPOINTS 40
+skill PRAYER 43
+watch grade lastGrade.letter
+watch newGhost lastGrade.newGhost
+watch sink lastGrade.sinks.0.sentence
+watch second lastGrade.sinks.1
+watch room1 liveSplits.rows.0.delta
+watch room2 liveSplits.rows.1.delta
+watch room2ghost liveSplits.rows.1.ghost
+watch room2mine liveSplits.rows.1.mine
+tick 2
+
+# ---- Run one: the ghost. ------------------------------------------------------------------
+# Room 1: in on the first tick, three urns three ticks apart, then the door.
+varbit NTK_ROOM_NUMBER 1
+varbit NTK_PLAYER_TIMER_COUNT 1
+varbit NTK_TRAP_ACTIVE 0
+tick
+expect room2ghost = null
+tick 4
+varbit NTK_URN1_STATE 1
+xp THIEVING 14893
+tick
+tick 2
+varbit NTK_URN2_STATE 1
+xp THIEVING 14953
+tick
+tick 2
+varbit NTK_URN3_STATE 1
+xp THIEVING 15013
+tick
+tick 5
+# Room 2, 17 ticks after room 1: four urns three ticks apart.
+varbit NTK_ROOM_NUMBER 2
+varbit NTK_URN1_STATE 0
+varbit NTK_URN2_STATE 0
+varbit NTK_URN3_STATE 0
+tick
+tick 4
+varbit NTK_URN1_STATE 1
+xp THIEVING 15103
+tick
+tick 2
+varbit NTK_URN2_STATE 1
+xp THIEVING 15193
+tick
+tick 2
+varbit NTK_URN3_STATE 1
+xp THIEVING 15283
+tick
+tick 2
+varbit NTK_URN4_STATE 1
+xp THIEVING 15373
+tick
+tick 3
+# Out: the first run of its kind has no letter and becomes the ghost.
+varbit NTK_PLAYER_TIMER_COUNT 0
+tick
+expect grade = null
+expect newGhost = true
+expect sink = null
+tick 5
+
+# ---- Run two: room 2's urns take eight ticks each. ------------------------------------------
+varbit NTK_URN1_STATE 0
+varbit NTK_URN2_STATE 0
+varbit NTK_URN3_STATE 0
+varbit NTK_URN4_STATE 0
+varbit NTK_ROOM_NUMBER 1
+varbit NTK_PLAYER_TIMER_COUNT 1
+tick
+# A run under way shows no grade, and the ghost it races reached room 2 in 18 ticks.
+expect grade = null
+expect room2ghost = 18
+tick 4
+varbit NTK_URN1_STATE 1
+xp THIEVING 15433
+tick
+tick 2
+varbit NTK_URN2_STATE 1
+xp THIEVING 15493
+tick
+tick 2
+varbit NTK_URN3_STATE 1
+xp THIEVING 15553
+tick
+tick 5
+varbit NTK_ROOM_NUMBER 2
+varbit NTK_URN1_STATE 0
+varbit NTK_URN2_STATE 0
+varbit NTK_URN3_STATE 0
+tick
+# Room 1 took 17 ticks, the same as the ghost's.
+expect room1 = 0
+tick 4
+varbit NTK_URN1_STATE 1
+xp THIEVING 15643
+tick
+tick 7
+varbit NTK_URN2_STATE 1
+xp THIEVING 15733
+tick
+# Still inside the ghost's 18 ticks in room 2: no gap shown yet.
+expect room2mine = 13
+expect room2 = null
+tick 7
+varbit NTK_URN3_STATE 1
+xp THIEVING 15823
+tick
+# 21 ticks in, three over the ghost: the gap shows the tick it opens.
+expect room2mine = 21
+expect room2 = 3
+tick 7
+varbit NTK_URN4_STATE 1
+xp THIEVING 15913
+tick
+tick 3
+varbit NTK_PLAYER_TIMER_COUNT 0
+tick
+# 540 xp in 51 ticks against the ghost's 540 in 36, each with the 60-tick walk back: 96/111 of the
+# ghost's rate, 86%, a B (A needs 90%). Room 2's urns took 24 ticks to the ghost's 9.
+expect grade = B
+expect newGhost = false
+expect second = null
+expect sink = "Room 2: 24 ticks searching 4 urns, ghost took 9"
+expect room1 = null

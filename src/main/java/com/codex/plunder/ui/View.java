@@ -1,7 +1,9 @@
 package com.codex.plunder.ui;
 
 import com.codex.plunder.core.Check;
+import com.codex.plunder.core.Ghost;
 import com.codex.plunder.core.Goal;
+import com.codex.plunder.core.Grade;
 import com.codex.plunder.core.Leaks;
 import com.codex.plunder.core.NavigatorGoals;
 import com.codex.plunder.core.Plan;
@@ -209,6 +211,31 @@ public final class View
 	List<NavigatorGoals.Need> goals = Collections.emptyList();
 	/** Whether the pyramid card names the player; off to share it without the name. */
 	boolean nameOnCard = true;
+	/** The run under way, or the last one, against its ghost; null with neither. */
+	GhostSplits ghost;
+	/** The last run's grade card, shown until the next run begins; null with none. */
+	Grade grade;
+
+	/** A run cut into its segments against its ghost, for the split table. */
+	public static final class GhostSplits
+	{
+		final Run run;
+		final Run ghost;
+		final boolean live;
+		final List<Ghost.Row> rows;
+
+		/**
+		 * @param run the run, or a snapshot of the one under way
+		 * @param ghost the ghost it is measured against, or null when there is none yet
+		 */
+		public GhostSplits(Run run, Run ghost, boolean live)
+		{
+			this.run = run;
+			this.ghost = ghost;
+			this.live = live;
+			this.rows = Ghost.rows(run, ghost, live);
+		}
+	}
 
 	public View(State state, String player, int level, long xp, int targetLevel, Goal goal, Plan plan, Plan fresh,
 		List<Plan> ladder, Step step, Live live, Record record, long now)
@@ -243,6 +270,18 @@ public final class View
 	public View goals(List<NavigatorGoals.Need> goals)
 	{
 		this.goals = goals == null ? Collections.emptyList() : goals;
+		return this;
+	}
+
+	public View ghost(GhostSplits ghost)
+	{
+		this.ghost = ghost;
+		return this;
+	}
+
+	public View grade(Grade grade)
+	{
+		this.grade = grade;
 		return this;
 	}
 

@@ -106,6 +106,18 @@ public interface CodexPlunderPilotConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "ghostOverlay",
+		name = "Ghost splits on screen",
+		description = "Show each room's time in game ticks against your ghost run in the game view during a run; the panel always shows them",
+		position = 5,
+		section = inGame
+	)
+	default boolean ghostOverlay()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "summary",
 		name = "Run summary in chat",
 		description = "Say in the chat box what a run earned and the sceptre odds it carried when it ends",

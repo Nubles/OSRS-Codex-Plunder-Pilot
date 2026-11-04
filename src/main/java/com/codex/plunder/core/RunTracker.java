@@ -28,6 +28,10 @@ public final class RunTracker
 	private final long[] opened = new long[Room.values().length];
 	private final int[] entered = new int[Room.values().length];
 	private final int[] passes = new int[Room.values().length];
+	private final int[] urnTicks = new int[Room.values().length];
+	private final int[] chestTicks = new int[Room.values().length];
+	private final int[] sarcophagusTicks = new int[Room.values().length];
+	private final int[] urnsIn = new int[Room.values().length];
 
 	public boolean isActive()
 	{
@@ -57,6 +61,10 @@ public final class RunTracker
 		java.util.Arrays.fill(opened, 0);
 		java.util.Arrays.fill(entered, -1);
 		java.util.Arrays.fill(passes, -1);
+		java.util.Arrays.fill(urnTicks, 0);
+		java.util.Arrays.fill(chestTicks, 0);
+		java.util.Arrays.fill(sarcophagusTicks, 0);
+		java.util.Arrays.fill(urnsIn, 0);
 	}
 
 	/** The player is in this room now. Moving one room deeper times the room just left. */
@@ -114,6 +122,11 @@ public final class RunTracker
 			return;
 		}
 		urns++;
+		if (room != null)
+		{
+			urnTicks[room.ordinal()] += sinceLast(tick);
+			urnsIn[room.ordinal()]++;
+		}
 		if (lastUrnTick >= 0 && pace != null)
 		{
 			pace.urnTook(room, tick - lastUrnTick);
@@ -130,6 +143,7 @@ public final class RunTracker
 		}
 		chests++;
 		opened[room.ordinal()]++;
+		chestTicks[room.ordinal()] += sinceLast(tick);
 		acted(tick);
 	}
 
@@ -141,7 +155,17 @@ public final class RunTracker
 		}
 		sarcophagi++;
 		opened[room.ordinal()]++;
+		sarcophagusTicks[room.ordinal()] += sinceLast(tick);
 		acted(tick);
+	}
+
+	/**
+	 * Ticks since the last search in the room, which this search is charged with. The first search in
+	 * a room is charged nothing: the trap and the walk to it belong to the room's crossing.
+	 */
+	private int sinceLast(int tick)
+	{
+		return actedHere ? Math.max(0, tick - lastActionTick) : 0;
 	}
 
 	private void acted(int tick)
@@ -231,6 +255,21 @@ public final class RunTracker
 	}
 
 	/**
+	 * The run so far as if it ended on this tick, for the ghost splits while it is under way; null
+	 * when no run is.
+	 */
+	public Run snapshot(int tick)
+	{
+		if (!active)
+		{
+			return null;
+		}
+		return new Run(startedAt, Math.max(0, tick - startTick), deepest, thievingXp, strengthXp, urns, chests,
+			sarcophagi, artefacts, artefactCount, Odds.atLeastOne(opened), sceptre, goal, entered, passes)
+			.searches(urnTicks, chestTicks, sarcophagusTicks, urnsIn);
+	}
+
+	/**
 	 * Ends the run.
 	 *
 	 * @return the run, or null when nothing at all was done in it
@@ -247,6 +286,7 @@ public final class RunTracker
 			return null;
 		}
 		return new Run(startedAt, Math.max(0, tick - startTick), deepest, thievingXp, strengthXp, urns, chests,
-			sarcophagi, artefacts, artefactCount, Odds.atLeastOne(opened), sceptre, goal, entered, passes);
+			sarcophagi, artefacts, artefactCount, Odds.atLeastOne(opened), sceptre, goal, entered, passes)
+			.searches(urnTicks, chestTicks, sarcophagusTicks, urnsIn);
 	}
 }

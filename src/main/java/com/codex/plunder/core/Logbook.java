@@ -36,6 +36,8 @@ public final class Logbook
 	/** Artefacts in the bank as last seen here, by item id. */
 	private Map<Integer, Long> banked = new TreeMap<>();
 	private long bankedAt;
+	/** The ghost for each kind of run, by {@link Ghost#key}: the best run of that kind, kept however old. */
+	private Map<String, Run> ghosts = new TreeMap<>();
 
 	public Pace getPace()
 	{
@@ -173,6 +175,54 @@ public final class Logbook
 		totalTicks += run.getTicks();
 	}
 
+	/** The ghost kept under a key, or null. */
+	public Run ghost(String key)
+	{
+		return key == null ? null : ghosts.get(key);
+	}
+
+	/**
+	 * The ghost a run under way is measured against: the one that reached the deepest room the
+	 * bracket opens, or else the deepest any ghost of the bracket reached. Null when there is none.
+	 */
+	public Run liveGhost(Goal goal, Room bracket)
+	{
+		if (bracket == null)
+		{
+			return null;
+		}
+		for (int deepest = bracket.getNumber(); deepest >= 1; deepest--)
+		{
+			Run g = ghosts.get(Ghost.key(goal, bracket, deepest));
+			if (g != null)
+			{
+				return g;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Offers a finished run as the ghost for its kind.
+	 *
+	 * @return whether it took the place of the ghost there was (or there was none)
+	 */
+	public boolean offerGhost(String key, Run run, Goal goal)
+	{
+		if (key == null || !Ghost.beats(run, ghosts.get(key), goal))
+		{
+			return false;
+		}
+		ghosts.put(key, run);
+		return true;
+	}
+
+	/** How many ghosts are kept. */
+	public int ghostCount()
+	{
+		return ghosts.size();
+	}
+
 	/**
 	 * The sceptre turned up just after the last run was closed, since finding it throws the player
 	 * out of the pyramid at once.
@@ -280,6 +330,10 @@ public final class Logbook
 		{
 			sceptre = new Sceptre();
 		}
+		ghosts = ghosts == null ? new TreeMap<>() : new TreeMap<>(ghosts);
+		ghosts.values().removeIf(r -> r == null);
+		ghosts.values().forEach(Run::repair);
+		ghosts.values().removeIf(r -> !Ghost.usable(r));
 		banked = banked == null ? new TreeMap<>() : new TreeMap<>(banked);
 		banked.entrySet().removeIf(e -> e.getKey() == null || e.getValue() == null || e.getValue() <= 0);
 		if (opened == null || opened.length != Room.values().length)

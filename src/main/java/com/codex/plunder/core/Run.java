@@ -20,6 +20,16 @@ public final class Run
 	private int[] splits;
 	/** Ticks each room took to cross without its searches: the trap, the walk and the door; -1 where not seen. Older saves have none. */
 	private int[] passes;
+	/**
+	 * Ticks each room's searches took, by room, the way the ghost splits time them: each search is
+	 * timed from the one before it in the room, so the first search's walk and the trap count in the
+	 * crossing. Null in saves made before ghost splits.
+	 */
+	private int[] urnTicks;
+	private int[] chestTicks;
+	private int[] sarcophagusTicks;
+	/** Urns searched in each room. */
+	private int[] urnsIn;
 
 	Run()
 	{
@@ -150,6 +160,51 @@ public final class Run
 		return passes == null || room == null || room.ordinal() >= passes.length ? -1 : passes[room.ordinal()];
 	}
 
+	/** Adds the searches' times room by room, which the ghost splits are drawn from. */
+	Run searches(int[] urnTicks, int[] chestTicks, int[] sarcophagusTicks, int[] urnsIn)
+	{
+		this.urnTicks = urnTicks == null ? null : urnTicks.clone();
+		this.chestTicks = chestTicks == null ? null : chestTicks.clone();
+		this.sarcophagusTicks = sarcophagusTicks == null ? null : sarcophagusTicks.clone();
+		this.urnsIn = urnsIn == null ? null : urnsIn.clone();
+		return this;
+	}
+
+	/** Whether the run kept its searches' times room by room, which a ghost needs. */
+	public boolean hasSearches()
+	{
+		int n = Room.values().length;
+		return splits != null && splits.length == n && urnTicks != null && urnTicks.length == n && chestTicks != null
+			&& chestTicks.length == n && sarcophagusTicks != null && sarcophagusTicks.length == n && urnsIn != null && urnsIn.length == n;
+	}
+
+	/** Ticks spent searching urns in the room, or -1 when not kept. */
+	public int urnTicksAt(Room room)
+	{
+		return at(urnTicks, room);
+	}
+
+	public int chestTicksAt(Room room)
+	{
+		return at(chestTicks, room);
+	}
+
+	public int sarcophagusTicksAt(Room room)
+	{
+		return at(sarcophagusTicks, room);
+	}
+
+	/** Urns searched in the room, or -1 when not kept. */
+	public int urnsAt(Room room)
+	{
+		return at(urnsIn, room);
+	}
+
+	private static int at(int[] a, Room room)
+	{
+		return a == null || room == null || room.ordinal() >= a.length ? -1 : a[room.ordinal()];
+	}
+
 	/** Brings back into range what a damaged save left out of it. */
 	void repair()
 	{
@@ -175,6 +230,16 @@ public final class Run
 			for (int k = 0; k < passes.length; k++)
 			{
 				passes[k] = Math.max(-1, passes[k]);
+			}
+		}
+		for (int[] a : new int[][]{urnTicks, chestTicks, sarcophagusTicks, urnsIn})
+		{
+			if (a != null)
+			{
+				for (int k = 0; k < a.length; k++)
+				{
+					a[k] = Math.max(0, a[k]);
+				}
 			}
 		}
 	}
