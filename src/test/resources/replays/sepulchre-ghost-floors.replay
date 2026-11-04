@@ -1,0 +1,144 @@
+# Hallowed Sepulchre: two runs to floor 4 at Agility 85, the first setting the ghost, the second
+# raced against it floor by floor.
+#
+# Facts:
+#  - floors open at Agility 52, 62, 72, 77 and 87, so 85 opens four; floors pay 575, 925, 1,600 and
+#    2,875 Agility xp (oldschool.runescape.wiki/w/Hallowed_Sepulchre, the floor table)
+#  - a coffin gives 1 mark on floor 1, 2-3 on floor 2, 3-5 on floor 3 and 3-6 on floor 4
+#    (oldschool.runescape.wiki/w/Coffin_(Hallowed_Sepulchre)); coffins need Thieving 66
+#  - the messages are the game's as RuneLite's ChatCommandsPlugin reads them ("You have completed
+#    Floor N of the Hallowed Sepulchre!", "Floor N time: <col=ff0000>..</col>")
+#  - the run's timer is the interface RuneLite names InterfaceID.HallowedOverlay
+# Schematic: the scene is not the real map; nothing here reads where the player stands.
+scene 2240 5888
+at 2260 5900
+skill AGILITY 85 3300000
+skill THIEVING 70
+skill HITPOINTS 80
+item HALLOWED_MARK "Hallowed mark" stacks
+# The pack, sent at login, empty.
+items INV clear
+
+watch inRun sepTracker.active
+watch floor sepTracker.floor
+watch runs sepLog.totalRuns
+watch marks sepLast.run.marks
+watch coffins sepLast.run.coffins
+watch time sepLast.run.totalTime
+watch xp sepLast.run.agilityXp
+watch total sepLast.total
+watch newGhost sepNewGhost
+watch row1 sepLive.rows.0.delta
+watch row2 sepLive.rows.1.delta
+watch row2live sepLive.rows.1.live
+watch liveTotal sepLive.total
+watch bank sepLog.bankMarks
+tick 2
+expect inRun = false
+
+# The bank: 500 marks and a Ring of endurance already found.
+items BANK HALLOWED_MARK 500 stacked
+items BANK RING_OF_ENDURANCE_UNCHARGED 1
+tick
+expect bank = 500
+
+# ---- Run one: the ghost. --------------------------------------------------------------------
+widget HallowedOverlay.TIMER hidden false
+tick
+expect inRun = true
+expect floor = 1
+tick 50
+items INV HALLOWED_MARK 1 stacked
+tick 49
+chat GAMEMESSAGE "You have completed Floor 1 of the Hallowed Sepulchre! Total completions: <col=ff0000>12</col>."
+chat GAMEMESSAGE "Floor 1 time: <col=ff0000>1:00.00</col>. Personal best: 0:58.20"
+xp AGILITY 3300575
+tick
+expect floor = 2
+# Racing nothing yet: the first run has no ghost.
+expect liveTotal = null
+tick 40
+items INV HALLOWED_MARK 2 stacked
+tick 40
+items INV HALLOWED_MARK 3 stacked
+tick 69
+chat GAMEMESSAGE "You have completed Floor 2 of the Hallowed Sepulchre! Total completions: <col=ff0000>12</col>."
+chat GAMEMESSAGE "Floor 2 time: <col=ff0000>1:30.00</col>. Personal best: 1:20.00"
+xp AGILITY 3301500
+tick
+tick 50
+items INV HALLOWED_MARK 3 stacked
+tick 50
+items INV HALLOWED_MARK 4 stacked
+tick 50
+items INV HALLOWED_MARK 5 stacked
+tick 49
+chat GAMEMESSAGE "You have completed Floor 3 of the Hallowed Sepulchre! Total completions: <col=ff0000>12</col>."
+chat GAMEMESSAGE "Floor 3 time: <col=ff0000>2:00.00</col>. Personal best: 1:50.00"
+xp AGILITY 3303100
+tick
+tick 100
+items INV HALLOWED_MARK 6 stacked
+tick 100
+items INV HALLOWED_MARK 3 stacked
+tick 49
+chat GAMEMESSAGE "You have completed Floor 4 of the Hallowed Sepulchre! Total completions: <col=ff0000>12</col>."
+chat GAMEMESSAGE "Floor 4 time: <col=ff0000>2:30.00</col>. Personal best: 2:20.00<br>Overall time: <col=ff0000>7:00.00</col>. Personal best: 6:40.00"
+xp AGILITY 3305975
+tick
+# Up the stairs and out: the timer goes, and six seconds later the run is over.
+widget HallowedOverlay.TIMER hidden true
+tick 5
+expect inRun = true
+tick 5
+expect inRun = false
+expect runs = 1
+expect marks = 27
+expect coffins = 8
+expect xp = 5975
+expect time = 420000
+expect newGhost = true
+expect total = null
+
+# ---- Run two: a quicker floor 1, a slower floor 2. --------------------------------------------
+tick 20
+widget HallowedOverlay.TIMER hidden false
+tick
+expect inRun = true
+expect newGhost = false
+tick 89
+chat GAMEMESSAGE "You have completed Floor 1 of the Hallowed Sepulchre! Total completions: <col=ff0000>13</col>."
+chat GAMEMESSAGE "Floor 1 time: <col=ff0000>0:54.00</col> (new personal best)"
+tick
+# Six seconds up on the ghost's floor 1.
+expect row1 = -6000
+expect liveTotal = -6000
+# Inside the ghost's 1:30 on floor 2, nothing is said for it yet.
+tick 140
+expect row2live = true
+expect row2 = null
+# Past it, the overrun shows and eats into the lead: 166 ticks on the floor (the tick the message
+# came in counts as the floor's first) is 1:39.6, 9.6 seconds over the ghost's 1:30.
+tick 25
+expect row2 = 9600
+expect liveTotal = 3600
+chat GAMEMESSAGE "You have completed Floor 2 of the Hallowed Sepulchre! Total completions: <col=ff0000>13</col>."
+chat GAMEMESSAGE "Floor 2 time: <col=ff0000>1:36.00</col>. Personal best: 1:20.00"
+tick
+expect row2 = 6000
+expect liveTotal = 0
+tick 190
+chat GAMEMESSAGE "You have completed Floor 3 of the Hallowed Sepulchre! Total completions: <col=ff0000>13</col>."
+chat GAMEMESSAGE "Floor 3 time: <col=ff0000>1:55.00</col>. Personal best: 1:50.00"
+tick 250
+chat GAMEMESSAGE "You have completed Floor 4 of the Hallowed Sepulchre! Total completions: <col=ff0000>13</col>."
+chat GAMEMESSAGE "Floor 4 time: <col=ff0000>2:30.00</col>. Personal best: 2:20.00<br>Overall time: <col=ff0000>6:55.00</col>. Personal best: 6:40.00"
+tick
+widget HallowedOverlay.TIMER hidden true
+tick 10
+expect inRun = false
+expect runs = 2
+expect total = -5000
+expect newGhost = true
+expect time = 415000
+expect marks = 0

@@ -29,10 +29,24 @@ import com.codex.plunder.core.Unlock;
 import com.codex.plunder.overlay.GhostOverlay;
 import com.codex.plunder.overlay.PilotPlaque;
 import com.codex.plunder.overlay.RoomHighlights;
+import com.codex.plunder.overlay.SepulchreOverlay;
+import com.codex.plunder.sepulchre.Floor;
+import com.codex.plunder.sepulchre.FloorSplits;
+import com.codex.plunder.sepulchre.Reward;
+import com.codex.plunder.sepulchre.SepulchreChat;
+import com.codex.plunder.sepulchre.SepulchreLog;
+import com.codex.plunder.sepulchre.SepulchrePace;
+import com.codex.plunder.sepulchre.SepulchreRun;
+import com.codex.plunder.sepulchre.SepulchreTracker;
+import com.codex.plunder.sepulchre.Unique;
 import com.codex.plunder.ui.Actions;
 import com.codex.plunder.ui.Format;
 import com.codex.plunder.ui.GhostTable;
+import com.codex.plunder.ui.FloorTable;
 import com.codex.plunder.ui.PilotPanel;
+import com.codex.plunder.ui.SepulchrePanel;
+import com.codex.plunder.ui.SepulchreSigil;
+import com.codex.plunder.ui.SepulchreView;
 import com.codex.plunder.ui.Sigil;
 import com.codex.plunder.ui.Theme;
 import com.codex.plunder.ui.View;
@@ -43,6 +57,7 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +89,7 @@ import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.WallObjectDespawned;
 import net.runelite.api.events.WallObjectSpawned;
 import net.runelite.api.events.WidgetClosed;
+import net.runelite.api.widgets.Widget;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
@@ -102,8 +118,8 @@ import org.slf4j.LoggerFactory;
 
 @PluginDescriptor(
 	name = "Codex Plunder Pilot",
-	description = "Plans every Pyramid Plunder run for your Thieving level: which rooms to walk through, which urns, chests and sarcophagi are worth the clock, and your sceptre odds",
-	tags = {"pyramid plunder", "thieving", "sophanem", "sceptre", "pharaoh", "urn", "minigame", "codex"}
+	description = "Plans every Pyramid Plunder run for your Thieving level and times every Hallowed Sepulchre run floor by floor against your best, with your marks and unique odds",
+	tags = {"pyramid plunder", "thieving", "sophanem", "sceptre", "pharaoh", "urn", "minigame", "codex", "hallowed sepulchre", "agility", "hallowed mark", "splits"}
 )
 public class CodexPlunderPilotPlugin extends Plugin
 {
@@ -216,6 +232,31 @@ public class CodexPlunderPilotPlugin extends Plugin
 	private List<NavigatorGoals.Need> navNeeds = Collections.emptyList();
 	private int navLevel = -1;
 
+	// The Hallowed Sepulchre.
+
+	private static final String SEPULCHRE_KEY = "sepulchre";
+	/**
+	 * Ticks the Sepulchre's timer may be gone, as on the stairs between floors, before the run is
+	 * taken as over: six seconds.
+	 */
+	private static final int SEPULCHRE_GONE_TICKS = 10;
+	private final SepulchreTracker sepTracker = new SepulchreTracker();
+	private final SepulchreOverlay sepOverlay = new SepulchreOverlay();
+	private SepulchreLog sepLog;
+	private boolean sepUnsaved;
+	private boolean sepDirty;
+	private SepulchrePanel sepPanel;
+	private NavigationButton sepNav;
+	/** Ticks since the Sepulchre's timer was last on screen during a run. */
+	private int sepGone;
+	/** Hallowed marks in the pack as last counted, -1 before the pack is seen. */
+	private int packMarks = -1;
+	/** The last run against the ghost it raced, shown until the next run. */
+	private FloorSplits sepLast;
+	private boolean sepNewGhost;
+	/** The run under way against its ghost, worked out each tick of it. */
+	private FloorSplits sepLive;
+
 	@Provides
 	CodexPlunderPilotConfig provideConfig(ConfigManager configManager)
 	{
@@ -236,6 +277,18 @@ public class CodexPlunderPilotPlugin extends Plugin
 		overlayManager.add(plaque);
 		overlayManager.add(highlights);
 		overlayManager.add(ghostOverlay);
+		overlayManager.add(sepOverlay);
+		sepPanel = new SepulchrePanel();
+		sepNav = NavigationButton.builder()
+			.tooltip("Codex Sepulchre")
+			.icon(SepulchreSigil.icon(16))
+			.priority(9)
+			.panel(sepPanel)
+			.build();
+		if (config.sepulchrePanel())
+		{
+			clientToolbar.addNavigation(sepNav);
+		}
 		clientThread.invokeLater(() ->
 		{
 			loadProfile();
@@ -253,9 +306,12 @@ public class CodexPlunderPilotPlugin extends Plugin
 		overlayManager.remove(plaque);
 		overlayManager.remove(highlights);
 		overlayManager.remove(ghostOverlay);
+		overlayManager.remove(sepOverlay);
 		clientToolbar.removeNavigation(navButton);
+		clientToolbar.removeNavigation(sepNav);
 		clientThread.invokeLater(() ->
 		{
+			sepulchreForget();
 			save();
 			// A logbook still being read off the client thread must not come back after this.
 			loadGeneration++;
@@ -264,6 +320,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 			forgetScene();
 		});
 		panel = null;
+		sepPanel = null;
 	}
 
 	@Subscribe
@@ -276,7 +333,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 		{
 			try
 			{
-				if (unsaved && profile != null && logbook != null)
+				if ((unsaved || sepUnsaved) && profile != null && logbook != null)
 				{
 					save();
 					configManager.sendConfig();
@@ -304,6 +361,8 @@ public class CodexPlunderPilotPlugin extends Plugin
 				break;
 			case LOGIN_SCREEN:
 				endRun();
+				endSepulchre();
+				packMarks = -1;
 				save();
 				lastXp.clear();
 				seenLevel = -1;
@@ -340,6 +399,25 @@ public class CodexPlunderPilotPlugin extends Plugin
 		if (CodexPlunderPilotConfig.GROUP.equals(event.getGroup()))
 		{
 			dirty = true;
+			sepDirty = true;
+			if ("sepulchrePanel".equals(event.getKey()))
+			{
+				SwingUtilities.invokeLater(() ->
+				{
+					if (sepNav == null)
+					{
+						return;
+					}
+					if (config.sepulchrePanel())
+					{
+						clientToolbar.addNavigation(sepNav);
+					}
+					else
+					{
+						clientToolbar.removeNavigation(sepNav);
+					}
+				});
+			}
 		}
 		else if (NavigatorGoals.GROUP.equals(event.getGroup()) && NavigatorGoals.KEY.equals(event.getKey()))
 		{
@@ -434,6 +512,10 @@ public class CodexPlunderPilotPlugin extends Plugin
 	{
 		ChatMessageType type = event.getType();
 		if (logbook == null || type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.SPAM)
+		{
+			return;
+		}
+		if (sepulchreHeard(SepulchreChat.read(event.getMessage())))
 		{
 			return;
 		}
@@ -541,6 +623,17 @@ public class CodexPlunderPilotPlugin extends Plugin
 	public void onStatChanged(StatChanged event)
 	{
 		Skill skill = event.getSkill();
+		if (skill == Skill.AGILITY)
+		{
+			Integer before = lastXp.put(skill, event.getXp());
+			int gained = Experience.gained(before, event.getXp());
+			if (gained > 0 && sepTracker.isActive())
+			{
+				sepTracker.agility(gained);
+				sepDirty = true;
+			}
+			return;
+		}
 		if (skill == Skill.HITPOINTS || skill == Skill.PRAYER)
 		{
 			// The ready check reads both.
@@ -582,6 +675,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
+		sepulchreItems(event.getContainerId(), event.getItemContainer());
 		if (event.getContainerId() == InventoryID.BANK && logbook != null)
 		{
 			Check.SceptreKit banked = Check.SceptreKit.NONE;
@@ -736,6 +830,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 		{
 			return;
 		}
+		sepulchreTick();
 		int level = client.getRealSkillLevel(Skill.THIEVING);
 		long xp = client.getSkillExperience(Skill.THIEVING);
 		if (xp > 0)
@@ -777,6 +872,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 		// Experience not sent yet reads 0; taken as the start, the real total would count as one gain.
 		baseline(Skill.THIEVING);
 		baseline(Skill.STRENGTH);
+		baseline(Skill.AGILITY);
 		if (lastPack == null && client.getItemContainer(InventoryID.INV) != null)
 		{
 			lastPack = pack(client.getItemContainer(InventoryID.INV));
@@ -1245,6 +1341,287 @@ public class CodexPlunderPilotPlugin extends Plugin
 		return splitBook;
 	}
 
+	// The Hallowed Sepulchre: information only. Each floor is timed and set against the ghost, the
+	// marks and coffins counted, and nothing here points at an obstacle or says when to move.
+
+	/** Takes in what the game said about the run; true when the message was the Sepulchre's. */
+	private boolean sepulchreHeard(SepulchreChat.Heard heard)
+	{
+		if (heard == null || sepLog == null)
+		{
+			return false;
+		}
+		int tick = client.getTickCount();
+		if (heard.floorDone > 0)
+		{
+			if (!sepTracker.isActive())
+			{
+				// The timer was not seen (a login part way down, say): the message alone starts the run.
+				startSepulchre(tick);
+			}
+			if (!sepTracker.floorDone(heard.floorDone, tick))
+			{
+				// A floor this run already finished: the last run ended unseen and a new one is under way.
+				endSepulchre();
+				startSepulchre(tick);
+				sepTracker.floorDone(heard.floorDone, tick);
+			}
+			sepGone = 0;
+		}
+		if (heard.timedFloor > 0)
+		{
+			sepTracker.floorTime(heard.timedFloor, heard.floorMs, heard.overallMs);
+		}
+		if (heard.grand)
+		{
+			sepTracker.grandOpened();
+		}
+		sepDirty = true;
+		return true;
+	}
+
+	private void startSepulchre(int tick)
+	{
+		sepTracker.begin(System.currentTimeMillis(), tick);
+		sepLast = null;
+		sepNewGhost = false;
+		sepGone = 0;
+	}
+
+	/** Marks gained in the pack, marks in the bank, and the uniques seen anywhere the player keeps things. */
+	private void sepulchreItems(int containerId, ItemContainer items)
+	{
+		if (sepLog == null || items == null)
+		{
+			return;
+		}
+		if (containerId != InventoryID.INV && containerId != InventoryID.WORN && containerId != InventoryID.BANK)
+		{
+			return;
+		}
+		for (Item item : items.getItems())
+		{
+			if (sepLog.markGot(Unique.of(item.getId())))
+			{
+				sepUnsaved = true;
+				sepDirty = true;
+			}
+		}
+		if (containerId == InventoryID.BANK && sepLog.setBankMarks(marksIn(items)))
+		{
+			sepUnsaved = true;
+			sepDirty = true;
+		}
+		if (containerId == InventoryID.INV)
+		{
+			int marks = marksIn(items);
+			if (packMarks >= 0 && marks > packMarks && sepTracker.isActive())
+			{
+				sepTracker.marks(marks - packMarks);
+			}
+			sepDirty |= marks != packMarks;
+			packMarks = marks;
+		}
+	}
+
+	private static int marksIn(ItemContainer items)
+	{
+		long n = 0;
+		for (Item item : items.getItems())
+		{
+			if (item.getId() == ItemID.HALLOWED_MARK)
+			{
+				n += item.getQuantity();
+			}
+		}
+		return (int) Math.min(Integer.MAX_VALUE, n);
+	}
+
+	/**
+	 * Every tick: whether a run is under way, read from the Sepulchre's own timer on screen
+	 * (InterfaceID.HallowedOverlay, the one RuneLite's widget overlays name the Sepulchre timer),
+	 * and the run so far against its ghost.
+	 */
+	private void sepulchreTick()
+	{
+		if (sepLog == null)
+		{
+			return;
+		}
+		if (client.getSkillExperience(Skill.AGILITY) > 0
+			&& sepLog.seen(client.getRealSkillLevel(Skill.AGILITY), client.getRealSkillLevel(Skill.THIEVING)))
+		{
+			sepUnsaved = true;
+			sepDirty = true;
+		}
+		if (packMarks < 0 && client.getItemContainer(InventoryID.INV) != null)
+		{
+			packMarks = marksIn(client.getItemContainer(InventoryID.INV));
+			sepDirty = true;
+		}
+		int tick = client.getTickCount();
+		Widget timer = client.getWidget(InterfaceID.HallowedOverlay.TIMER);
+		boolean shown = timer != null && !timer.isHidden();
+		if (shown)
+		{
+			sepGone = 0;
+			if (!sepTracker.isActive())
+			{
+				startSepulchre(tick);
+			}
+		}
+		else if (sepTracker.isActive() && ++sepGone >= SEPULCHRE_GONE_TICKS)
+		{
+			endSepulchre();
+		}
+		if (sepTracker.isActive())
+		{
+			SepulchreRun now = sepTracker.snapshot(tick);
+			SepulchreRun ghost = sepLog.liveGhost(Floor.open(sepLog.getAgility()));
+			sepLive = FloorSplits.of(now, ghost, sepTracker.getFloor(), sepTracker.onFloor(tick) * SepulchreRun.TICK_MS);
+			sepOverlay.show(config.sepulchreOverlay() ? sepLive : null);
+			sepDirty = true;
+		}
+		if (sepDirty)
+		{
+			publishSepulchre();
+		}
+	}
+
+	private void sepulchreForget()
+	{
+		sepTracker.finish(client.getTickCount());
+		sepOverlay.show(null);
+		sepLive = null;
+		sepGone = 0;
+	}
+
+	/** Ends the run under way, keeps it in the log, and says how it went. */
+	private void endSepulchre()
+	{
+		sepOverlay.show(null);
+		sepLive = null;
+		sepGone = 0;
+		if (!sepTracker.isActive())
+		{
+			return;
+		}
+		SepulchreRun run = sepTracker.finish(client.getTickCount());
+		sepDirty = true;
+		if (run == null || sepLog == null)
+		{
+			return;
+		}
+		SepulchreRun ghost = sepLog.ghost(run.getDeepest());
+		sepLast = FloorSplits.of(run, ghost, 0, 0);
+		sepNewGhost = sepLog.offerGhost(run);
+		sepLog.record(run);
+		sepUnsaved = true;
+		save();
+		if (config.sepulchreSummary())
+		{
+			chatSepulchre(run, sepLast.total(), ghost != null);
+		}
+	}
+
+	private void chatSepulchre(SepulchreRun run, Integer total, boolean hadGhost)
+	{
+		StringBuilder text = new StringBuilder();
+		int time = run.totalTime();
+		text.append(run.getDeepest() == 0 ? "no floor finished" : "floor " + run.getDeepest() + (time > 0 ? " in " + FloorTable.time(time) : ""));
+		text.append(", ").append(run.getMarks()).append(run.getMarks() == 1 ? " mark" : " marks");
+		if (run.getCoffins() > 0 || run.isGrand())
+		{
+			text.append(" from ").append(run.getCoffins()).append(run.getCoffins() == 1 ? " coffin" : " coffins");
+			text.append(run.isGrand() ? " and the grand coffin" : "");
+		}
+		if (run.getAgilityXp() > 0)
+		{
+			text.append(", +").append(String.format(java.util.Locale.ENGLISH, "%,d", run.getAgilityXp())).append(" Agility xp");
+		}
+		if (sepNewGhost && hadGhost && total != null)
+		{
+			text.append(". New ghost to floor ").append(run.getDeepest()).append(", ").append(FloorTable.delta(total).substring(1)).append(" faster");
+		}
+		else if (sepNewGhost)
+		{
+			text.append(". Now your ghost to floor ").append(run.getDeepest());
+		}
+		else if (total != null)
+		{
+			text.append(". ").append(Math.abs(total) < 50 ? "Level with" : FloorTable.delta(total).substring(1) + (total < 0 ? " ahead of" : " behind"))
+				.append(" your ghost");
+		}
+		SepulchrePace pace = sepLog.pace();
+		Reward reward = config.sepulchreReward();
+		long need = reward.getCost() - Math.max(0, sepLog.getBankMarks()) - Math.max(0, packMarks);
+		long runs = pace == null ? -1 : pace.runsFor(need);
+		if (need > 0 && runs > 0 && sepLog.getBankMarks() >= 0)
+		{
+			text.append(". ").append(reward.getLabel()).append(" in about ").append(runs).append(runs == 1 ? " run" : " runs");
+		}
+		text.append(".");
+		chatMessageManager.queue(QueuedMessage.builder()
+			.type(ChatMessageType.CONSOLE)
+			.runeLiteFormattedMessage(new ChatMessageBuilder()
+				.append(ChatColorType.HIGHLIGHT)
+				.append("Codex Sepulchre: ")
+				.append(ChatColorType.NORMAL)
+				.append(text.toString())
+				.build())
+			.build());
+	}
+
+	private void publishSepulchre()
+	{
+		sepDirty = false;
+		SepulchrePanel target = sepPanel;
+		if (target == null)
+		{
+			return;
+		}
+		boolean loggedIn = client.getGameState() == GameState.LOGGED_IN && client.getLocalPlayer() != null;
+		if (sepLog == null || !loggedIn && sepLog.getAgility() == 0)
+		{
+			SwingUtilities.invokeLater(() -> target.update(SepulchreView.loggedOut()));
+			return;
+		}
+		long now = System.currentTimeMillis();
+		SepulchreView view = new SepulchreView(SepulchreView.State.READY, loggedIn ? client.getLocalPlayer().getName() : null,
+			sepLog.getAgility(), sepLog.getThieving(), now);
+		view.splits = sepLive != null ? sepLive : sepLast;
+		view.newGhost = sepLive == null && sepNewGhost;
+		List<SepulchreRun> runs = sepLog.getRuns();
+		if (view.splits == null && !runs.isEmpty())
+		{
+			// After a login, the last run logged against the ghost for its depth, unless it is that ghost.
+			SepulchreRun last = runs.get(runs.size() - 1);
+			SepulchreRun ghost = sepLog.ghost(last.getDeepest());
+			view.splits = FloorSplits.of(last, ghost == last ? null : ghost, 0, 0);
+			view.newGhost = ghost == last;
+		}
+		view.runs = new ArrayList<>(runs);
+		view.totalRuns = sepLog.getTotalRuns();
+		view.totalMarks = sepLog.getTotalMarks();
+		view.totalXp = sepLog.getTotalXp();
+		view.grands = sepLog.getGrands();
+		view.coffins = sepLog.getCoffins();
+		view.pace = sepLog.pace();
+		view.packMarks = Math.max(0, packMarks);
+		view.bankMarks = sepLog.getBankMarks();
+		view.target = config.sepulchreReward();
+		EnumSet<Unique> got = EnumSet.noneOf(Unique.class);
+		for (Unique u : Unique.values())
+		{
+			if (sepLog.has(u))
+			{
+				got.add(u);
+			}
+		}
+		view.got = got;
+		SwingUtilities.invokeLater(() -> target.update(view));
+	}
+
 	// Saving.
 
 	private void loadProfile()
@@ -1258,6 +1635,12 @@ public class CodexPlunderPilotPlugin extends Plugin
 		lastGrade = null;
 		lastSplits = null;
 		liveSplits = null;
+		sepLog = null;
+		sepLast = null;
+		sepLive = null;
+		sepNewGhost = false;
+		sepUnsaved = false;
+		sepDirty = true;
 		int generation = ++loadGeneration;
 		if (profile == null)
 		{
@@ -1303,6 +1686,7 @@ public class CodexPlunderPilotPlugin extends Plugin
 				});
 			});
 		}
+		sepLog = SepulchreLog.read(gson, configManager.getRSProfileConfiguration(CodexPlunderPilotConfig.GROUP, SEPULCHRE_KEY));
 		sharedBanked = readSharedBank();
 		readNavigator();
 		unsaved = false;
@@ -1344,6 +1728,11 @@ public class CodexPlunderPilotPlugin extends Plugin
 
 	private void save()
 	{
+		if (profile != null && sepLog != null && sepUnsaved)
+		{
+			sepUnsaved = false;
+			configManager.setConfiguration(CodexPlunderPilotConfig.GROUP, profile, SEPULCHRE_KEY, gson.toJson(sepLog));
+		}
 		if (profile == null || logbook == null || !unsaved)
 		{
 			return;

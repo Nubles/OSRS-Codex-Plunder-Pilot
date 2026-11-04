@@ -1,5 +1,6 @@
 package com.codex.plunder;
 
+import com.codex.plunder.sepulchre.Reward;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -31,6 +32,61 @@ public interface CodexPlunderPilotConfig extends Config
 		position = 2
 	)
 	String panel = "panel";
+
+	@ConfigSection(
+		name = "Hallowed Sepulchre",
+		description = "Floor splits, marks and unique odds for the Hallowed Sepulchre",
+		position = 3
+	)
+	String sepulchre = "sepulchre";
+
+	@ConfigItem(
+		keyName = "sepulchrePanel",
+		name = "Sepulchre panel",
+		description = "Add a side panel that times your Hallowed Sepulchre runs floor by floor and counts your marks",
+		position = 0,
+		section = sepulchre
+	)
+	default boolean sepulchrePanel()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "sepulchreReward",
+		name = "Saving marks for",
+		description = "The Hallowed Sepulchre reward the panel counts your marks toward, with the runs it takes at your pace",
+		position = 1,
+		section = sepulchre
+	)
+	default Reward sepulchreReward()
+	{
+		return Reward.DARK_GRACEFUL;
+	}
+
+	@ConfigItem(
+		keyName = "sepulchreOverlay",
+		name = "Floor splits on screen",
+		description = "Show each Sepulchre floor's time against your ghost in the game view during a run; the panel always shows them",
+		position = 2,
+		section = sepulchre
+	)
+	default boolean sepulchreOverlay()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "sepulchreSummary",
+		name = "Sepulchre summary in chat",
+		description = "Say in the chat box how a Sepulchre run went against your ghost and what it found when it ends",
+		position = 3,
+		section = sepulchre
+	)
+	default boolean sepulchreSummary()
+	{
+		return true;
+	}
 
 	@ConfigItem(
 		keyName = "goalLevel",
