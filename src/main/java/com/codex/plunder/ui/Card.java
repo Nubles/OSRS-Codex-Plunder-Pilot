@@ -101,10 +101,12 @@ public class Card extends JPanel
 
 		if (accent != null)
 		{
-			g.setClip(shape);
-			g.setPaint(new GradientPaint(0, 0, accent, 0, h, Theme.alpha(accent, 90)));
-			g.fillRect(0, 0, 3, h);
-			g.setClip(null);
+			// Clip to the card on a copy, never by clearing the clip after: the painter's own clip stays.
+			Graphics2D a = (Graphics2D) g.create();
+			a.clip(shape);
+			a.setPaint(new GradientPaint(0, 0, accent, 0, h, Theme.alpha(accent, 90)));
+			a.fillRect(0, 0, 3, h);
+			a.dispose();
 		}
 
 		Color rim = highlighted ? Theme.alpha(Theme.GOLD, 150) : hover ? Theme.alpha(Theme.GOLD, 90) : Theme.STROKE_SOFT;

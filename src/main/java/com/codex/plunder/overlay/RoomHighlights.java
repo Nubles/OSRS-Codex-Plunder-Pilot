@@ -59,8 +59,25 @@ public class RoomHighlights extends Overlay
 		this.marks = marks == null ? Collections.emptyList() : marks;
 	}
 
+	/**
+	 * Draws on a copy of the graphics, so no font, colour, stroke, hint, transform or clip set here
+	 * reaches the overlays drawn after this one.
+	 */
 	@Override
-	public Dimension render(Graphics2D g)
+	public Dimension render(Graphics2D graphics)
+	{
+		Graphics2D g = (Graphics2D) graphics.create();
+		try
+		{
+			return draw(g);
+		}
+		finally
+		{
+			g.dispose();
+		}
+	}
+
+	private Dimension draw(Graphics2D g)
 	{
 		List<Mark> list = marks;
 		if (list.isEmpty())
